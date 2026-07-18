@@ -19,7 +19,9 @@ function Map() {
 
       container: mapContainer.current,
 
-      // Temporary style - we replace this with our custom neon style next
+      // Temporary map style
+      // We will replace this with the custom neon street style
+      // after connecting the real map data
       style: "https://demotiles.maplibre.org/style.json",
 
       // Peterborough Ontario
@@ -30,6 +32,10 @@ function Map() {
 
       zoom: 12,
 
+      minZoom: 10,
+
+      maxZoom: 19,
+
       pitch: 0,
 
       bearing: 0
@@ -37,10 +43,35 @@ function Map() {
     });
 
 
+    // Zoom + navigation controls
     map.current.addControl(
       new maplibregl.NavigationControl(),
       "top-right"
     );
+
+
+    // Add a marker for the center of Peterborough
+    new maplibregl.Marker({
+      color: "#00b7ff"
+    })
+      .setLngLat([
+        -78.3197,
+        44.3091
+      ])
+      .addTo(map.current);
+
+
+    return () => {
+
+      if (map.current) {
+
+        map.current.remove();
+
+        map.current = null;
+
+      }
+
+    };
 
 
   }, []);
