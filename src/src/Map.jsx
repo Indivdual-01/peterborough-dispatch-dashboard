@@ -3,6 +3,7 @@ import maplibregl from "maplibre-gl";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
+import neonMapStyle from "./neon-map-style.js";
 
 function Map() {
 
@@ -22,8 +23,7 @@ function Map() {
       // Temporary map style
       // We will replace this with the custom neon street style
       // after connecting the real map data
-      style: "https://demotiles.maplibre.org/style.json",
-
+     style: neonMapStyle,
       // Peterborough Ontario
       center: [
         -78.3197,
