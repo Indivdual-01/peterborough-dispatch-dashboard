@@ -72,22 +72,34 @@ export async function onRequestPost(context) {
       arrayBufferToBase64(audioBuffer);
 
     const result = await context.env.AI.run(
-      "@cf/openai/whisper-large-v3-turbo",
-      {
-        audio: audioBase64,
-        task: "transcribe",
-        language: "en",
-        vad_filter: true,
-        condition_on_previous_text: false,
-        no_speech_threshold: 0.6,
-        initial_prompt:
-          "Emergency radio dispatch in Peterborough, Ontario, Canada. " +
-          "Possible locations include Lansdowne Street, Monaghan Road, " +
-          "Chemong Road, Parkhill Road, Ashburnham Drive, Water Street, " +
-          "George Street, Charlotte Street, Sherbrooke Street, Highway 7, " +
-          "Highway 28 and Highway 115."
-      }
-    );
+  "@cf/openai/whisper-large-v3-turbo",
+  {
+    audio: audioBase64,
+    task: "transcribe",
+    language: "en",
+    vad_filter: true,
+
+    // Higher beam search can improve accuracy,
+    // although it may take slightly longer.
+    beam_size: 8,
+
+    // Helps Whisper use context inside the recording.
+    condition_on_previous_text: true,
+
+    no_speech_threshold: 0.6,
+
+    initial_prompt:
+      "Emergency services radio dispatch in Peterborough, Ontario, Canada. " +
+      "Speakers may use police, fire, EMS and OPP radio terminology, unit numbers, " +
+      "ten-codes and short clipped sentences. Common phrases include 10-4, copy, " +
+      "dispatch, respond, en route, scene, collision, traffic stop, ambulance, " +
+      "fire department and Peterborough Police. Possible locations include " +
+      "Lansdowne Street, Monaghan Road, Chemong Road, Parkhill Road, " +
+      "Ashburnham Drive, Water Street, George Street, Charlotte Street, " +
+      "Sherbrooke Street, Clonsilla Avenue, Television Road, Armour Road, " +
+      "The Parkway, Highway 7, Highway 28 and Highway 115."
+  }
+);
 
     const transcript =
       typeof result?.text === "string"
