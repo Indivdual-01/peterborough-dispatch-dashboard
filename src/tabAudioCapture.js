@@ -131,7 +131,7 @@ export async function startListening({
       // Each recording is a complete, independent audio file.
       const blob = await recordSegment(
         audioOnlyStream,
-        18000
+        30000
       );
 
       if (!isListening || blob.size === 0) {
