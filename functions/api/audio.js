@@ -64,7 +64,10 @@ function normalizeLocation(location) {
   const confidence = Number.isFinite(
     confidenceNumber
   )
-    ? Math.min(1, Math.max(0, confidenceNumber))
+    ? Math.min(
+        1,
+        Math.max(0, confidenceNumber)
+      )
     : 0;
 
   const locationText =
@@ -89,15 +92,19 @@ function normalizeLocation(location) {
 
   return {
     hasLocation,
+
     locationText: hasLocation
       ? locationText
       : "",
+
     municipality: hasLocation
       ? municipality
       : "",
+
     locationType: hasLocation
       ? locationType
       : "unknown",
+
     confidence,
     geocoded: false,
     latitude: null,
@@ -226,6 +233,7 @@ function distanceKilometres(
   longitude2
 ) {
   const earthRadius = 6371;
+
   const toRadians = (degrees) =>
     degrees * Math.PI / 180;
 
@@ -256,6 +264,194 @@ function distanceKilometres(
   );
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function getMeaningfulTokens(value) {
+  const ignoredTokens = new Set([
+    "at",
+    "and",
+    "near",
+    "on",
+    "in",
+    "by",
+    "the",
+    "of",
+    "to",
+    "road",
+    "rd",
+    "street",
+    "st",
+    "avenue",
+    "ave",
+    "drive",
+    "dr",
+    "highway",
+    "hwy",
+    "route",
+    "line",
+    "county",
+    "peterborough",
+    "ontario",
+    "canada"
+  ]);
+
+  return [
+    ...new Set(
+      normalizeSearchText(value)
+        .split(/[^a-z0-9]+/)
+        .filter(Boolean)
+        .filter(
+          (token) =>
+            !ignoredTokens.has(token) &&
+            (
+              token.length >= 2 ||
+              /^\d+$/.test(token)
+            )
+        )
+    )
+  ];
+}
+
+function getFeatureTypes(feature) {
+  const values = [
+    ...(Array.isArray(feature?.place_type)
+      ? feature.place_type
+      : []),
+
+    ...(Array.isArray(feature?.types)
+      ? feature.types
+      : []),
+
+    feature?.type,
+    feature?.kind,
+    feature?.properties?.type,
+    feature?.properties?.kind
+  ];
+
+  return values
+    .filter(Boolean)
+    .map((value) =>
+      String(value).toLowerCase()
+    );
+}
+
+function getFeatureLabel(feature) {
+  return String(
+    feature?.place_name ||
+    feature?.text ||
+    feature?.properties?.name ||
+    ""
+  ).trim();
+}
+
+function countMatchingTokens(
+  locationText,
+  featureLabel
+) {
+  const requestedTokens =
+    getMeaningfulTokens(locationText);
+
+  const featureTokens = new Set(
+    getMeaningfulTokens(featureLabel)
+  );
+
+  return requestedTokens.filter((token) =>
+    featureTokens.has(token)
+  ).length;
+}
+
+function isReliableCandidate(
+  candidate,
+  location
+) {
+  const featureTypes = getFeatureTypes(
+    candidate.feature
+  );
+
+  const usefulTypes = new Set([
+    "address",
+    "road",
+    "street",
+    "poi",
+    "road_relation",
+    "virtual_street"
+  ]);
+
+  const hasUsefulType =
+    featureTypes.some((type) =>
+      usefulTypes.has(type)
+    );
+
+  if (!hasUsefulType) {
+    return false;
+  }
+
+  if (
+    candidate.distance > 160 ||
+    candidate.relevance < 0.65
+  ) {
+    return false;
+  }
+
+  const label = getFeatureLabel(
+    candidate.feature
+  );
+
+  const normalizedLabel =
+    normalizeSearchText(label)
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const genericLabels = new Set([
+    "peterborough",
+    "peterborough ontario",
+    "peterborough ontario canada",
+    "peterborough canada",
+    "peterborough county",
+    "peterborough county ontario",
+    "peterborough county ontario canada"
+  ]);
+
+  if (genericLabels.has(normalizedLabel)) {
+    return false;
+  }
+
+  const requestedTokens =
+    getMeaningfulTokens(
+      location.locationText
+    );
+
+  const matchingTokens =
+    countMatchingTokens(
+      location.locationText,
+      label
+    );
+
+  if (requestedTokens.length === 0) {
+    return candidate.relevance >= 0.8;
+  }
+
+  /*
+   * For an intersection, both road names should
+   * be represented. A match to only one road is
+   * rejected rather than placing a bad marker.
+   */
+  const requiredMatches =
+    location.locationType === "intersection"
+      ? Math.min(
+          2,
+          requestedTokens.length
+        )
+      : 1;
+
+  return matchingTokens >= requiredMatches;
+}
+
 async function geocodeLocation(
   location,
   mapTilerKey
@@ -270,8 +466,10 @@ async function geocodeLocation(
 
   const queryParts = [
     location.locationText,
+
     location.municipality ||
       "Peterborough County",
+
     "Ontario",
     "Canada"
   ];
@@ -302,6 +500,15 @@ async function geocodeLocation(
     url.searchParams.set(
       "language",
       "en"
+    );
+
+    /*
+     * Prevent municipality or county fallback
+     * results from being returned as map points.
+     */
+    url.searchParams.set(
+      "types",
+      "address,road,poi"
     );
 
     url.searchParams.set(
@@ -356,11 +563,14 @@ async function geocodeLocation(
           return null;
         }
 
-        const longitude = Number(center[0]);
-        const latitude = Number(center[1]);
-        const relevance = Number(
-          feature.relevance
-        );
+        const longitude =
+          Number(center[0]);
+
+        const latitude =
+          Number(center[1]);
+
+        const relevance =
+          Number(feature.relevance);
 
         if (
           !Number.isFinite(latitude) ||
@@ -377,35 +587,60 @@ async function geocodeLocation(
             longitude
           );
 
+        const tokenMatches =
+          countMatchingTokens(
+            location.locationText,
+            getFeatureLabel(feature)
+          );
+
         return {
           feature,
           latitude,
           longitude,
+
           relevance:
             Number.isFinite(relevance)
               ? relevance
               : 0,
-          distance
+
+          distance,
+          tokenMatches
         };
       })
       .filter(Boolean)
-      .filter(
-        (candidate) =>
-          candidate.distance <= 160 &&
-          candidate.relevance >= 0.4
+      .filter((candidate) =>
+        isReliableCandidate(
+          candidate,
+          location
+        )
       )
       .sort(
         (first, second) =>
+          second.tokenMatches -
+            first.tokenMatches ||
+
           second.relevance -
             first.relevance ||
+
           first.distance -
             second.distance
       );
 
     const bestMatch = candidates[0];
 
+    /*
+     * Do not return coordinates when MapTiler
+     * cannot find a reliable road/address/POI.
+     */
     if (!bestMatch) {
-      return location;
+      return {
+        ...location,
+        geocoded: false,
+        latitude: null,
+        longitude: null,
+        mapLabel: "",
+        geocodingConfidence: 0
+      };
     }
 
     return {
@@ -413,9 +648,11 @@ async function geocodeLocation(
       geocoded: true,
       latitude: bestMatch.latitude,
       longitude: bestMatch.longitude,
+
       mapLabel:
-        bestMatch.feature.place_name ||
+        getFeatureLabel(bestMatch.feature) ||
         location.locationText,
+
       geocodingConfidence:
         bestMatch.relevance
     };
@@ -434,14 +671,18 @@ export async function onRequestGet(
 ) {
   return jsonResponse({
     success: true,
+
     message:
-      "Peterborough Dispatch transcription, location and geocoding endpoint is ready.",
+      "Peterborough Dispatch transcription, location and reliable geocoding endpoint is ready.",
+
     aiBindingConnected: Boolean(
       context.env.AI
     ),
+
     mapTilerConnected: Boolean(
       context.env.MAPTILER_KEY
     ),
+
     endpoint: "/api/audio",
     time: new Date().toISOString()
   });
@@ -455,6 +696,7 @@ export async function onRequestPost(
       return jsonResponse(
         {
           success: false,
+
           error:
             "Cloudflare Workers AI is not connected."
         },
@@ -487,6 +729,7 @@ export async function onRequestPost(
       return jsonResponse(
         {
           success: false,
+
           error:
             "The audio recording is too large."
         },
@@ -506,7 +749,10 @@ export async function onRequestPost(
           language: "en",
           vad_filter: true,
           beam_size: 8,
-          condition_on_previous_text: true,
+
+          condition_on_previous_text:
+            true,
+
           no_speech_threshold: 0.6,
 
           initial_prompt:
@@ -543,10 +789,13 @@ export async function onRequestPost(
       success: true,
       transcript,
       location,
+
       heardSpeech:
         transcript.length > 0,
+
       receivedBytes:
         audioBuffer.byteLength,
+
       contentType,
       time: new Date().toISOString()
     });
@@ -559,8 +808,10 @@ export async function onRequestPost(
     return jsonResponse(
       {
         success: false,
+
         error:
           "Cloudflare could not process the audio.",
+
         details:
           error instanceof Error
             ? error.message
