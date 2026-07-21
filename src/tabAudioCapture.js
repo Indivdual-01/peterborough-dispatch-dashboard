@@ -21,7 +21,7 @@ function recordSegment(stream, durationMs) {
       mimeType
         ? {
             mimeType,
-            audioBitsPerSecond: 64000
+            audioBitsPerSecond: 96000
           }
         : undefined
     );
@@ -131,7 +131,7 @@ export async function startListening({
       // Each recording is a complete, independent audio file.
       const blob = await recordSegment(
         audioOnlyStream,
-        12000
+        18000
       );
 
       if (!isListening || blob.size === 0) {
