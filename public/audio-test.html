@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  />
+
+  <title>Peterborough Dispatch Audio Test</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      background: #10151d;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 30px;
+      background: #18212c;
+      border-radius: 14px;
+    }
+
+    button {
+      padding: 14px 22px;
+      border: 0;
+      border-radius: 8px;
+      font-size: 17px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+
+    pre {
+      min-height: 120px;
+      margin-top: 20px;
+      padding: 18px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      background: #0a0f15;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>Dispatch Audio Transcription Test</h1>
+
+    <p>
+      Start the Broadcastify audio in another tab. When radio speech
+      begins, press the button below. Choose the Broadcastify tab and
+      enable <strong>Share tab audio</strong>.
+    </p>
+
+    <button id="startButton">
+      Select Audio Tab and Record 15 Seconds
+    </button>
+
+    <p id="status">Status: Ready</p>
+
+    <h2>Cloudflare result</h2>
+    <pre id="result">No recording has been submitted.</pre>
+  </main>
+
+  <script>
+    const startButton = document.getElementById("startButton");
+    const statusElement = document.getElementById("status");
+    const resultElement = document.getElementById("result");
+
+    function setStatus(message) {
+      statusElement.textContent = `Status: ${message}`;
+    }
+
+    function chooseMimeType() {
+      const choices = [
+        "audio/webm;codecs=opus",
+        "audio/webm"
+      ];
+
+      return choices.find((type) =>
+        MediaRecorder.isTypeSupported(type)
+      ) || "";
+    }
+
+    function recordAudio(stream, durationMilliseconds) {
+      return new Promise((resolve, reject) => {
+        const mimeType = chooseMimeType();
+
+        const options = mimeType
+          ? {
+              mimeType,
+              audioBitsPerSecond: 64000
+            }
+          : undefined;
+
+        const recorder = new MediaRecorder(stream, options);
+        const chunks = [];
+
+        recorder.addEventListener("dataavailable", (event) => {
+          if (event.data.size > 0) {
+            chunks.push(event.data);
+          }
+        });
+
+        recorder.addEventListener("error", (event) => {
+          reject(
+            event.error ||
+            new Error("The audio recording failed.")
+          );
+        });
+
+        recorder.addEventListener("stop", () => {
+          resolve(
+            new Blob(chunks, {
+              type: recorder.mimeType || "audio/webm"
+            })
+          );
+        });
+
+        recorder.start();
+
+        window.setTimeout(() => {
+          if (recorder.state !== "inactive") {
+            recorder.stop();
+          }
+        }, durationMilliseconds);
+      });
+    }
+
+    startButton.addEventListener("click", async () => {
+      let displayStream;
+
+      startButton.disabled = true;
+      resultElement.textContent = "";
+      setStatus("Waiting for you to select the audio tab");
+
+      try {
+        displayStream =
+          await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true
+          });
+
+        const audioTrack =
+          displayStream.getAudioTracks()[0];
+
+        if (!audioTrack) {
+          throw new Error(
+            'No tab audio was shared. Select the Broadcastify tab and make sure "Share tab audio" is enabled.'
+          );
+        }
+
+        const audioOnlyStream =
+          new MediaStream([audioTrack]);
+
+        setStatus("Recording selected tab for 15 seconds");
+
+        const audioBlob =
+          await recordAudio(audioOnlyStream, 15000);
+
+        displayStream
+          .getTracks()
+          .forEach((track) => track.stop());
+
+        if (audioBlob.size === 0) {
+          throw new Error(
+            "The browser produced an empty recording."
+          );
+        }
+
+        setStatus("Sending audio to Cloudflare AI");
+
+        const response = await fetch("/api/audio", {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              audioBlob.type || "audio/webm"
+          },
+          body: audioBlob
+        });
+
+        const responseText = await response.text();
+
+        let result;
+
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          throw new Error(
+            `Cloudflare returned an unexpected response: ${responseText}`
+          );
+        }
+
+        resultElement.textContent =
+          JSON.stringify(result, null, 2);
+
+        if (!response.ok || !result.success) {
+          throw new Error(
+            result.details ||
+            result.error ||
+            `Request failed with status ${response.status}`
+          );
+        }
+
+        if (result.transcript) {
+          setStatus("Transcription completed successfully");
+        } else {
+          setStatus(
+            "Cloudflare received the audio, but no clear speech was detected"
+          );
+        }
+      } catch (error) {
+        if (displayStream) {
+          displayStream
+            .getTracks()
+            .forEach((track) => track.stop());
+        }
+
+        setStatus("Test failed");
+
+        resultElement.textContent =
+          error instanceof Error
+            ? error.message
+            : String(error);
+      } finally {
+        startButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
