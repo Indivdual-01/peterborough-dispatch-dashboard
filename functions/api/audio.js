@@ -34,7 +34,12 @@ function createEmptyLocation() {
     locationText: "",
     municipality: "",
     locationType: "unknown",
-    confidence: 0
+    confidence: 0,
+    geocoded: false,
+    latitude: null,
+    longitude: null,
+    mapLabel: "",
+    geocodingConfidence: 0
   };
 }
 
@@ -52,22 +57,15 @@ function normalizeLocation(location) {
     "unknown"
   ]);
 
-  const confidenceNumber =
-    Number(location.confidence);
+  const confidenceNumber = Number(
+    location.confidence
+  );
 
   const confidence = Number.isFinite(
     confidenceNumber
   )
-    ? Math.min(
-        1,
-        Math.max(0, confidenceNumber)
-      )
+    ? Math.min(1, Math.max(0, confidenceNumber))
     : 0;
-
-  const locationType =
-    allowedTypes.has(location.locationType)
-      ? location.locationType
-      : "unknown";
 
   const locationText =
     typeof location.locationText === "string"
@@ -79,6 +77,11 @@ function normalizeLocation(location) {
       ? location.municipality.trim()
       : "";
 
+  const locationType =
+    allowedTypes.has(location.locationType)
+      ? location.locationType
+      : "unknown";
+
   const hasLocation =
     Boolean(location.hasLocation) &&
     locationText.length > 0 &&
@@ -86,13 +89,21 @@ function normalizeLocation(location) {
 
   return {
     hasLocation,
-    locationText:
-      hasLocation ? locationText : "",
-    municipality:
-      hasLocation ? municipality : "",
-    locationType:
-      hasLocation ? locationType : "unknown",
-    confidence
+    locationText: hasLocation
+      ? locationText
+      : "",
+    municipality: hasLocation
+      ? municipality
+      : "",
+    locationType: hasLocation
+      ? locationType
+      : "unknown",
+    confidence,
+    geocoded: false,
+    latitude: null,
+    longitude: null,
+    mapLabel: "",
+    geocodingConfidence: 0
   };
 }
 
@@ -115,15 +126,14 @@ async function extractLocation(
           {
             role: "system",
             content:
-              "You extract reported incident locations from emergency-service radio transcripts. " +
-              "The geographic area is Peterborough, Ontario, Canada, Peterborough County, and nearby communities. " +
-              "A valid location may be a civic address, intersection, road, highway, landmark, business, park, or public place. " +
-              "Correct an obvious speech-transcription error only when the intended local place is clear. " +
+              "Extract the reported incident location from an emergency-service radio transcript. " +
+              "The geographic area is Peterborough, Ontario, Peterborough County and nearby communities. " +
+              "A valid location may be an address, intersection, road, highway, landmark, business, park or public place. " +
+              "Correct obvious transcription mistakes only when the intended local location is clear. " +
               "Never invent or guess a location. " +
               "Return hasLocation false when no reliable location is spoken. " +
-              "Do not treat a responding unit's movement, patrol route, current vehicle position, or destination without an incident as an incident location. " +
-              "For an intersection, include both road names. " +
-              "Use the clearest normalized location wording possible."
+              "Do not use a responding unit's movement, patrol route or vehicle position as an incident location. " +
+              "For an intersection, include both road names."
           },
           {
             role: "user",
@@ -190,11 +200,6 @@ async function extractLocation(
 
     let location = extraction?.response;
 
-    /*
-     * Cloudflare normally returns the JSON Mode
-     * result as an object. This also handles a
-     * string response safely.
-     */
     if (typeof location === "string") {
       try {
         location = JSON.parse(location);
@@ -210,11 +215,217 @@ async function extractLocation(
       error
     );
 
-    /*
-     * A location-extraction failure should not
-     * prevent the transcript from appearing.
-     */
     return createEmptyLocation();
+  }
+}
+
+function distanceKilometres(
+  latitude1,
+  longitude1,
+  latitude2,
+  longitude2
+) {
+  const earthRadius = 6371;
+  const toRadians = (degrees) =>
+    degrees * Math.PI / 180;
+
+  const latitudeDifference = toRadians(
+    latitude2 - latitude1
+  );
+
+  const longitudeDifference = toRadians(
+    longitude2 - longitude1
+  );
+
+  const firstLatitude = toRadians(latitude1);
+  const secondLatitude = toRadians(latitude2);
+
+  const calculation =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(firstLatitude) *
+      Math.cos(secondLatitude) *
+      Math.sin(longitudeDifference / 2) ** 2;
+
+  return (
+    earthRadius *
+    2 *
+    Math.atan2(
+      Math.sqrt(calculation),
+      Math.sqrt(1 - calculation)
+    )
+  );
+}
+
+async function geocodeLocation(
+  location,
+  mapTilerKey
+) {
+  if (
+    !mapTilerKey ||
+    !location.hasLocation ||
+    location.confidence < 0.65
+  ) {
+    return location;
+  }
+
+  const queryParts = [
+    location.locationText,
+    location.municipality ||
+      "Peterborough County",
+    "Ontario",
+    "Canada"
+  ];
+
+  const query = [
+    ...new Set(
+      queryParts
+        .map((part) => part?.trim())
+        .filter(Boolean)
+    )
+  ].join(", ");
+
+  try {
+    const url = new URL(
+      `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json`
+    );
+
+    url.searchParams.set(
+      "key",
+      mapTilerKey
+    );
+
+    url.searchParams.set(
+      "country",
+      "ca"
+    );
+
+    url.searchParams.set(
+      "language",
+      "en"
+    );
+
+    url.searchParams.set(
+      "limit",
+      "5"
+    );
+
+    url.searchParams.set(
+      "proximity",
+      "-78.3197,44.3091"
+    );
+
+    url.searchParams.set(
+      "autocomplete",
+      "false"
+    );
+
+    url.searchParams.set(
+      "fuzzyMatch",
+      "true"
+    );
+
+    const response = await fetch(
+      url.toString()
+    );
+
+    if (!response.ok) {
+      console.error(
+        "MapTiler geocoding failed:",
+        response.status
+      );
+
+      return location;
+    }
+
+    const data = await response.json();
+
+    const features = Array.isArray(
+      data?.features
+    )
+      ? data.features
+      : [];
+
+    const candidates = features
+      .map((feature) => {
+        const center = feature?.center;
+
+        if (
+          !Array.isArray(center) ||
+          center.length < 2
+        ) {
+          return null;
+        }
+
+        const longitude = Number(center[0]);
+        const latitude = Number(center[1]);
+        const relevance = Number(
+          feature.relevance
+        );
+
+        if (
+          !Number.isFinite(latitude) ||
+          !Number.isFinite(longitude)
+        ) {
+          return null;
+        }
+
+        const distance =
+          distanceKilometres(
+            44.3091,
+            -78.3197,
+            latitude,
+            longitude
+          );
+
+        return {
+          feature,
+          latitude,
+          longitude,
+          relevance:
+            Number.isFinite(relevance)
+              ? relevance
+              : 0,
+          distance
+        };
+      })
+      .filter(Boolean)
+      .filter(
+        (candidate) =>
+          candidate.distance <= 160 &&
+          candidate.relevance >= 0.4
+      )
+      .sort(
+        (first, second) =>
+          second.relevance -
+            first.relevance ||
+          first.distance -
+            second.distance
+      );
+
+    const bestMatch = candidates[0];
+
+    if (!bestMatch) {
+      return location;
+    }
+
+    return {
+      ...location,
+      geocoded: true,
+      latitude: bestMatch.latitude,
+      longitude: bestMatch.longitude,
+      mapLabel:
+        bestMatch.feature.place_name ||
+        location.locationText,
+      geocodingConfidence:
+        bestMatch.relevance
+    };
+  } catch (error) {
+    console.error(
+      "MapTiler geocoding error:",
+      error
+    );
+
+    return location;
   }
 }
 
@@ -224,9 +435,12 @@ export async function onRequestGet(
   return jsonResponse({
     success: true,
     message:
-      "Peterborough Dispatch transcription and location endpoint is ready.",
+      "Peterborough Dispatch transcription, location and geocoding endpoint is ready.",
     aiBindingConnected: Boolean(
       context.env.AI
+    ),
+    mapTilerConnected: Boolean(
+      context.env.MAPTILER_KEY
     ),
     endpoint: "/api/audio",
     time: new Date().toISOString()
@@ -313,10 +527,16 @@ export async function onRequestPost(
         ? transcription.text.trim()
         : "";
 
-    const location =
+    const extractedLocation =
       await extractLocation(
         transcript,
         context.env.AI
+      );
+
+    const location =
+      await geocodeLocation(
+        extractedLocation,
+        context.env.MAPTILER_KEY
       );
 
     return jsonResponse({
@@ -332,7 +552,7 @@ export async function onRequestPost(
     });
   } catch (error) {
     console.error(
-      "Audio transcription failed:",
+      "Audio processing failed:",
       error
     );
 
@@ -340,7 +560,7 @@ export async function onRequestPost(
       {
         success: false,
         error:
-          "Cloudflare could not transcribe the audio.",
+          "Cloudflare could not process the audio.",
         details:
           error instanceof Error
             ? error.message
