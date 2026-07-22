@@ -19,12 +19,12 @@ function safelySetPaint(
 ) {
   try {
     map.setPaintProperty(
-      map && layerId ? layerId : "",
+      layerId,
       property,
       value
     );
   } catch {
-    // Skip unsupported paint properties.
+    // Ignore unsupported paint properties.
   }
 }
 
@@ -49,6 +49,10 @@ function applyNeonMapStyle(map) {
       `${layerId} ${sourceLayer}`
         .toLowerCase();
 
+    /*
+     * BACKGROUND
+     */
+
     if (layer.type === "background") {
       safelySetPaint(
         map,
@@ -67,14 +71,21 @@ function applyNeonMapStyle(map) {
       return;
     }
 
+    /*
+     * FILLS
+     * - water: very dark blue
+     * - parks/green/beige patches: black
+     * - buildings: very dark grey
+     */
+
     if (layer.type === "fill") {
       const isWater =
-        /water|ocean|lake|river|stream|reservoir/.test(
+        /water|ocean|lake|river|stream|reservoir|pond|basin/.test(
           description
         );
 
-      const isPark =
-        /park|wood|forest|grass|landcover|nature|green/.test(
+      const isParkOrLandPatch =
+        /park|wood|forest|grass|landcover|nature|green|farmland|meadow|scrub|wetland|sand|beach|cemetery|golf/.test(
           description
         );
 
@@ -88,7 +99,7 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "fill-color",
-          "#05070d"
+          "#020611"
         );
 
         safelySetPaint(
@@ -97,12 +108,21 @@ function applyNeonMapStyle(map) {
           "fill-opacity",
           1
         );
-      } else if (isPark) {
+
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-outline-color",
+          "#020611"
+        );
+      } else if (
+        isParkOrLandPatch
+      ) {
         safelySetPaint(
           map,
           layerId,
           "fill-color",
-          "#d9dcc7"
+          "#000000"
         );
 
         safelySetPaint(
@@ -110,20 +130,34 @@ function applyNeonMapStyle(map) {
           layerId,
           "fill-opacity",
           1
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-outline-color",
+          "#000000"
         );
       } else if (isBuilding) {
         safelySetPaint(
           map,
           layerId,
           "fill-color",
-          "#070707"
+          "#171717"
         );
 
         safelySetPaint(
           map,
           layerId,
           "fill-opacity",
-          0.95
+          0.96
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-outline-color",
+          "#1d1d1d"
         );
       } else {
         safelySetPaint(
@@ -139,14 +173,14 @@ function applyNeonMapStyle(map) {
           "fill-opacity",
           1
         );
-      }
 
-      safelySetPaint(
-        map,
-        layerId,
-        "fill-outline-color",
-        "#101010"
-      );
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-outline-color",
+          "#000000"
+        );
+      }
 
       return;
     }
@@ -159,18 +193,23 @@ function applyNeonMapStyle(map) {
         map,
         layerId,
         "fill-extrusion-color",
-        "#080808"
+        "#1a1a1a"
       );
 
       safelySetPaint(
         map,
         layerId,
         "fill-extrusion-opacity",
-        0.75
+        0.78
       );
 
       return;
     }
+
+    /*
+     * ROADS
+     * toned-down neon
+     */
 
     if (layer.type === "line") {
       const isMajorRoad =
@@ -292,14 +331,14 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-color",
-          "#102433"
+          "#0b1422"
         );
 
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
-          0.65
+          0.7
         );
       } else if (isBoundary) {
         safelySetPaint(
@@ -333,6 +372,10 @@ function applyNeonMapStyle(map) {
 
       return;
     }
+
+    /*
+     * LABELS
+     */
 
     if (layer.type === "symbol") {
       const isRoadLabel =
