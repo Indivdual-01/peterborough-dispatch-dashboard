@@ -292,9 +292,9 @@ function App() {
     <div className="app">
       <div className="sidebar">
         <h1>
-          Peterborough
+          Live Dispatch
           <br />
-          Dispatch Dashboard
+          Visualizer
         </h1>
 
         <div className="status">
@@ -412,6 +412,9 @@ function App() {
   );
 }
 
+createRoot(
+  document.getElementById("root")
+).render(<App />);
 createRoot(
   document.getElementById("root")
 ).render(<App />);
