@@ -1,4 +1,16 @@
-function jsonResponse(data, status = 200) {
+const CENTER = {
+  lat: 44.3091,
+  lon: -78.3197
+};
+
+const BBOX = {
+  south: 43.75,
+  west: -79.2,
+  north: 44.95,
+  east: -77.3
+};
+
+function json(data, status = 200) {
   return Response.json(data, {
     status,
     headers: {
@@ -7,28 +19,27 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function arrayBufferToBase64(buffer) {
+function toBase64(buffer) {
   const bytes = new Uint8Array(buffer);
-  const chunkSize = 32768;
   let binary = "";
 
   for (
     let index = 0;
     index < bytes.length;
-    index += chunkSize
+    index += 32768
   ) {
-    const chunk = bytes.subarray(
-      index,
-      index + chunkSize
+    binary += String.fromCharCode(
+      ...bytes.subarray(
+        index,
+        index + 32768
+      )
     );
-
-    binary += String.fromCharCode(...chunk);
   }
 
   return btoa(binary);
 }
 
-function createEmptyLocation() {
+function emptyLocation() {
   return {
     hasLocation: false,
     locationText: "",
@@ -39,13 +50,17 @@ function createEmptyLocation() {
     latitude: null,
     longitude: null,
     mapLabel: "",
-    geocodingConfidence: 0
+    geocodingConfidence: 0,
+    geocodingSource: ""
   };
 }
 
-function normalizeLocation(location) {
-  if (!location || typeof location !== "object") {
-    return createEmptyLocation();
+function normalizeLocation(value) {
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
+    return emptyLocation();
   }
 
   const allowedTypes = new Set([
@@ -57,60 +72,58 @@ function normalizeLocation(location) {
     "unknown"
   ]);
 
-  const confidenceNumber = Number(
-    location.confidence
-  );
+  const confidenceValue =
+    Number(value.confidence);
 
-  const confidence = Number.isFinite(
-    confidenceNumber
-  )
-    ? Math.min(
-        1,
-        Math.max(0, confidenceNumber)
-      )
-    : 0;
+  const confidence =
+    Number.isFinite(confidenceValue)
+      ? Math.max(
+          0,
+          Math.min(1, confidenceValue)
+        )
+      : 0;
 
   const locationText =
-    typeof location.locationText === "string"
-      ? location.locationText.trim()
+    typeof value.locationText === "string"
+      ? value.locationText.trim()
       : "";
 
   const municipality =
-    typeof location.municipality === "string"
-      ? location.municipality.trim()
+    typeof value.municipality === "string"
+      ? value.municipality.trim()
       : "";
 
   const locationType =
-    allowedTypes.has(location.locationType)
-      ? location.locationType
+    allowedTypes.has(value.locationType)
+      ? value.locationType
       : "unknown";
 
   const hasLocation =
-    Boolean(location.hasLocation) &&
-    locationText.length > 0 &&
+    Boolean(value.hasLocation) &&
+    Boolean(locationText) &&
     confidence >= 0.5;
 
   return {
+    ...emptyLocation(),
+
     hasLocation,
 
-    locationText: hasLocation
-      ? locationText
-      : "",
+    locationText:
+      hasLocation
+        ? locationText
+        : "",
 
-    municipality: hasLocation
-      ? municipality
-      : "",
+    municipality:
+      hasLocation
+        ? municipality
+        : "",
 
-    locationType: hasLocation
-      ? locationType
-      : "unknown",
+    locationType:
+      hasLocation
+        ? locationType
+        : "unknown",
 
-    confidence,
-    geocoded: false,
-    latitude: null,
-    longitude: null,
-    mapLabel: "",
-    geocodingConfidence: 0
+    confidence
   };
 }
 
@@ -118,35 +131,31 @@ async function extractLocation(
   transcript,
   ai
 ) {
-  if (
-    typeof transcript !== "string" ||
-    transcript.trim().length === 0
-  ) {
-    return createEmptyLocation();
+  if (!transcript?.trim()) {
+    return emptyLocation();
   }
 
   try {
-    const extraction = await ai.run(
+    const result = await ai.run(
       "@cf/meta/llama-3.1-8b-instruct-fast",
       {
         messages: [
           {
             role: "system",
+
             content:
               "Extract the reported incident location from an emergency-service radio transcript. " +
-              "The geographic area is Peterborough, Ontario, Peterborough County and nearby communities. " +
-              "A valid location may be an address, intersection, road, highway, landmark, business, park or public place. " +
-              "Correct obvious transcription mistakes only when the intended local location is clear. " +
-              "Never invent or guess a location. " +
-              "Return hasLocation false when no reliable location is spoken. " +
-              "Do not use a responding unit's movement, patrol route or vehicle position as an incident location. " +
+              "The area is Peterborough, Ontario, Peterborough County and nearby communities. " +
+              "A location may be an address, intersection, road, highway, landmark, business, park or public place. " +
+              "Never invent a location. " +
+              "Return hasLocation false when the location is unclear or missing. " +
+              "Do not treat a responding unit's movement, patrol route, or vehicle position as an incident location. " +
               "For an intersection, include both road names."
           },
+
           {
             role: "user",
-            content:
-              "Extract the incident location from this transcript:\n\n" +
-              transcript
+            content: transcript
           }
         ],
 
@@ -174,6 +183,7 @@ async function extractLocation(
 
               locationType: {
                 type: "string",
+
                 enum: [
                   "address",
                   "intersection",
@@ -205,74 +215,35 @@ async function extractLocation(
       }
     );
 
-    let location = extraction?.response;
+    let value = result?.response;
 
-    if (typeof location === "string") {
-      try {
-        location = JSON.parse(location);
-      } catch {
-        return createEmptyLocation();
-      }
+    if (typeof value === "string") {
+      value = JSON.parse(value);
     }
 
-    return normalizeLocation(location);
+    return normalizeLocation(value);
   } catch (error) {
     console.error(
       "Location extraction failed:",
       error
     );
 
-    return createEmptyLocation();
+    return emptyLocation();
   }
 }
 
-function distanceKilometres(
-  latitude1,
-  longitude1,
-  latitude2,
-  longitude2
-) {
-  const earthRadius = 6371;
-
-  const toRadians = (degrees) =>
-    degrees * Math.PI / 180;
-
-  const latitudeDifference = toRadians(
-    latitude2 - latitude1
-  );
-
-  const longitudeDifference = toRadians(
-    longitude2 - longitude1
-  );
-
-  const firstLatitude = toRadians(latitude1);
-  const secondLatitude = toRadians(latitude2);
-
-  const calculation =
-    Math.sin(latitudeDifference / 2) ** 2 +
-    Math.cos(firstLatitude) *
-      Math.cos(secondLatitude) *
-      Math.sin(longitudeDifference / 2) ** 2;
-
-  return (
-    earthRadius *
-    2 *
-    Math.atan2(
-      Math.sqrt(calculation),
-      Math.sqrt(1 - calculation)
-    )
-  );
-}
-
-function normalizeSearchText(value) {
+function normalizeText(value) {
   return String(value || "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
     .toLowerCase();
 }
 
-function getMeaningfulTokens(value) {
-  const ignoredTokens = new Set([
+function meaningfulTokens(value) {
+  const ignored = new Set([
     "at",
     "and",
     "near",
@@ -297,17 +268,21 @@ function getMeaningfulTokens(value) {
     "county",
     "peterborough",
     "ontario",
-    "canada"
+    "canada",
+    "west",
+    "east",
+    "north",
+    "south"
   ]);
 
   return [
     ...new Set(
-      normalizeSearchText(value)
+      normalizeText(value)
         .split(/[^a-z0-9]+/)
         .filter(Boolean)
         .filter(
           (token) =>
-            !ignoredTokens.has(token) &&
+            !ignored.has(token) &&
             (
               token.length >= 2 ||
               /^\d+$/.test(token)
@@ -317,30 +292,59 @@ function getMeaningfulTokens(value) {
   ];
 }
 
-function getFeatureTypes(feature) {
-  const values = [
-    ...(Array.isArray(feature?.place_type)
-      ? feature.place_type
-      : []),
+function splitIntersection(text) {
+  const parts = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(
+      /\s+(?:and|at|near|by|@|&|\/|x)\s+/i
+    )
+    .map((part) => part.trim())
+    .filter(Boolean);
 
-    ...(Array.isArray(feature?.types)
-      ? feature.types
-      : []),
-
-    feature?.type,
-    feature?.kind,
-    feature?.properties?.type,
-    feature?.properties?.kind
-  ];
-
-  return values
-    .filter(Boolean)
-    .map((value) =>
-      String(value).toLowerCase()
-    );
+  return parts.length >= 2
+    ? [parts[0], parts[1]]
+    : null;
 }
 
-function getFeatureLabel(feature) {
+function kilometres(
+  latitude1,
+  longitude1,
+  latitude2,
+  longitude2
+) {
+  const earthRadius = 6371;
+
+  const radians = (degrees) =>
+    degrees * Math.PI / 180;
+
+  const latitudeDifference =
+    radians(latitude2 - latitude1);
+
+  const longitudeDifference =
+    radians(longitude2 - longitude1);
+
+  const calculation =
+    Math.sin(
+      latitudeDifference / 2
+    ) ** 2 +
+    Math.cos(radians(latitude1)) *
+      Math.cos(radians(latitude2)) *
+      Math.sin(
+        longitudeDifference / 2
+      ) ** 2;
+
+  return (
+    earthRadius *
+    2 *
+    Math.atan2(
+      Math.sqrt(calculation),
+      Math.sqrt(1 - calculation)
+    )
+  );
+}
+
+function featureLabel(feature) {
   return String(
     feature?.place_name ||
     feature?.text ||
@@ -349,65 +353,39 @@ function getFeatureLabel(feature) {
   ).trim();
 }
 
-function countMatchingTokens(
-  locationText,
-  featureLabel
-) {
-  const requestedTokens =
-    getMeaningfulTokens(locationText);
+function featureTypes(feature) {
+  return [
+    ...(
+      Array.isArray(feature?.place_type)
+        ? feature.place_type
+        : []
+    ),
 
-  const featureTokens = new Set(
-    getMeaningfulTokens(featureLabel)
-  );
+    ...(
+      Array.isArray(feature?.types)
+        ? feature.types
+        : []
+    ),
 
-  return requestedTokens.filter((token) =>
-    featureTokens.has(token)
-  ).length;
+    feature?.type,
+    feature?.kind,
+    feature?.properties?.type,
+    feature?.properties?.kind
+  ]
+    .filter(Boolean)
+    .map(
+      (value) =>
+        String(value).toLowerCase()
+    );
 }
 
-function isReliableCandidate(
-  candidate,
-  location
-) {
-  const featureTypes = getFeatureTypes(
-    candidate.feature
-  );
-
-  const usefulTypes = new Set([
-    "address",
-    "road",
-    "street",
-    "poi",
-    "road_relation",
-    "virtual_street"
-  ]);
-
-  const hasUsefulType =
-    featureTypes.some((type) =>
-      usefulTypes.has(type)
-    );
-
-  if (!hasUsefulType) {
-    return false;
-  }
-
-  if (
-    candidate.distance > 160 ||
-    candidate.relevance < 0.65
-  ) {
-    return false;
-  }
-
-  const label = getFeatureLabel(
-    candidate.feature
-  );
-
-  const normalizedLabel =
-    normalizeSearchText(label)
+function isGenericLabel(label) {
+  const value =
+    normalizeText(label)
       .replace(/\s+/g, " ")
       .trim();
 
-  const genericLabels = new Set([
+  return new Set([
     "peterborough",
     "peterborough ontario",
     "peterborough ontario canada",
@@ -415,205 +393,251 @@ function isReliableCandidate(
     "peterborough county",
     "peterborough county ontario",
     "peterborough county ontario canada"
-  ]);
+  ]).has(value);
+}
 
-  if (genericLabels.has(normalizedLabel)) {
-    return false;
+function buildQueries(location) {
+  const municipality =
+    location.municipality ||
+    "Peterborough County";
+
+  const suffix =
+    `${municipality}, Ontario, Canada`;
+
+  const queries = [
+    `${location.locationText}, ${suffix}`
+  ];
+
+  if (
+    location.locationType ===
+    "intersection"
+  ) {
+    const roads =
+      splitIntersection(
+        location.locationText
+      );
+
+    if (roads) {
+      const [firstRoad, secondRoad] =
+        roads;
+
+      queries.unshift(
+        `${firstRoad} & ${secondRoad}, ${suffix}`,
+        `${firstRoad} at ${secondRoad}, ${suffix}`,
+        `${secondRoad} at ${firstRoad}, ${suffix}`
+      );
+    }
   }
 
+  return [...new Set(queries)];
+}
+
+async function mapTilerLookup(
+  location,
+  key
+) {
+  const encodedQueries =
+    buildQueries(location)
+      .map(
+        (query) =>
+          encodeURIComponent(query)
+      )
+      .join(";");
+
+  const url = new URL(
+    `https://api.maptiler.com/geocoding/${encodedQueries}.json`
+  );
+
+  url.searchParams.set(
+    "key",
+    key
+  );
+
+  url.searchParams.set(
+    "country",
+    "ca"
+  );
+
+  url.searchParams.set(
+    "language",
+    "en"
+  );
+
+  url.searchParams.set(
+    "types",
+    "address,road,poi"
+  );
+
+  url.searchParams.set(
+    "limit",
+    "5"
+  );
+
+  url.searchParams.set(
+    "proximity",
+    `${CENTER.lon},${CENTER.lat}`
+  );
+
+  url.searchParams.set(
+    "bbox",
+    [
+      BBOX.west,
+      BBOX.south,
+      BBOX.east,
+      BBOX.north
+    ].join(",")
+  );
+
+  url.searchParams.set(
+    "autocomplete",
+    "false"
+  );
+
+  url.searchParams.set(
+    "fuzzyMatch",
+    "true"
+  );
+
+  const response =
+    await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      `MapTiler returned ${response.status}`
+    );
+  }
+
+  const data =
+    await response.json();
+
+  const collections =
+    Array.isArray(data)
+      ? data
+      : [data];
+
+  const features =
+    collections.flatMap(
+      (item) =>
+        Array.isArray(item?.features)
+          ? item.features
+          : []
+    );
+
   const requestedTokens =
-    getMeaningfulTokens(
+    meaningfulTokens(
       location.locationText
     );
 
-  const matchingTokens =
-    countMatchingTokens(
-      location.locationText,
-      label
-    );
+  const usefulTypes =
+    new Set([
+      "address",
+      "road",
+      "street",
+      "poi",
+      "road_relation",
+      "virtual_street"
+    ]);
 
-  if (requestedTokens.length === 0) {
-    return candidate.relevance >= 0.8;
-  }
-
-  /*
-   * For an intersection, both road names should
-   * be represented. A match to only one road is
-   * rejected rather than placing a bad marker.
-   */
-  const requiredMatches =
-    location.locationType === "intersection"
-      ? Math.min(
-          2,
-          requestedTokens.length
-        )
-      : 1;
-
-  return matchingTokens >= requiredMatches;
-}
-
-async function geocodeLocation(
-  location,
-  mapTilerKey
-) {
-  if (
-    !mapTilerKey ||
-    !location.hasLocation ||
-    location.confidence < 0.65
-  ) {
-    return location;
-  }
-
-  const queryParts = [
-    location.locationText,
-
-    location.municipality ||
-      "Peterborough County",
-
-    "Ontario",
-    "Canada"
-  ];
-
-  const query = [
-    ...new Set(
-      queryParts
-        .map((part) => part?.trim())
-        .filter(Boolean)
-    )
-  ].join(", ");
-
-  try {
-    const url = new URL(
-      `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json`
-    );
-
-    url.searchParams.set(
-      "key",
-      mapTilerKey
-    );
-
-    url.searchParams.set(
-      "country",
-      "ca"
-    );
-
-    url.searchParams.set(
-      "language",
-      "en"
-    );
-
-    /*
-     * Prevent municipality or county fallback
-     * results from being returned as map points.
-     */
-    url.searchParams.set(
-      "types",
-      "address,road,poi"
-    );
-
-    url.searchParams.set(
-      "limit",
-      "5"
-    );
-
-    url.searchParams.set(
-      "proximity",
-      "-78.3197,44.3091"
-    );
-
-    url.searchParams.set(
-      "autocomplete",
-      "false"
-    );
-
-    url.searchParams.set(
-      "fuzzyMatch",
-      "true"
-    );
-
-    const response = await fetch(
-      url.toString()
-    );
-
-    if (!response.ok) {
-      console.error(
-        "MapTiler geocoding failed:",
-        response.status
-      );
-
-      return location;
-    }
-
-    const data = await response.json();
-
-    const features = Array.isArray(
-      data?.features
-    )
-      ? data.features
-      : [];
-
-    const candidates = features
+  const candidates =
+    features
       .map((feature) => {
-        const center = feature?.center;
+        const coordinates =
+          Array.isArray(feature?.center)
+            ? feature.center
+            : feature?.geometry
+                ?.coordinates;
 
         if (
-          !Array.isArray(center) ||
-          center.length < 2
+          !Array.isArray(coordinates) ||
+          coordinates.length < 2 ||
+          Array.isArray(coordinates[0])
         ) {
           return null;
         }
 
         const longitude =
-          Number(center[0]);
+          Number(coordinates[0]);
 
         const latitude =
-          Number(center[1]);
+          Number(coordinates[1]);
 
         const relevance =
-          Number(feature.relevance);
+          Number(feature.relevance) || 0;
 
-        if (
-          !Number.isFinite(latitude) ||
-          !Number.isFinite(longitude)
-        ) {
-          return null;
-        }
+        const label =
+          featureLabel(feature);
 
-        const distance =
-          distanceKilometres(
-            44.3091,
-            -78.3197,
-            latitude,
-            longitude
+        const labelTokens =
+          new Set(
+            meaningfulTokens(label)
           );
 
         const tokenMatches =
-          countMatchingTokens(
-            location.locationText,
-            getFeatureLabel(feature)
-          );
+          requestedTokens.filter(
+            (token) =>
+              labelTokens.has(token)
+          ).length;
 
         return {
           feature,
           latitude,
           longitude,
+          relevance,
+          label,
+          tokenMatches,
 
-          relevance:
-            Number.isFinite(relevance)
-              ? relevance
-              : 0,
-
-          distance,
-          tokenMatches
+          distance:
+            kilometres(
+              CENTER.lat,
+              CENTER.lon,
+              latitude,
+              longitude
+            )
         };
       })
       .filter(Boolean)
-      .filter((candidate) =>
-        isReliableCandidate(
-          candidate,
-          location
-        )
-      )
+      .filter((candidate) => {
+        const typeMatches =
+          featureTypes(
+            candidate.feature
+          ).some(
+            (type) =>
+              usefulTypes.has(type)
+          );
+
+        if (
+          !typeMatches ||
+          isGenericLabel(
+            candidate.label
+          )
+        ) {
+          return false;
+        }
+
+        if (
+          candidate.distance > 160 ||
+          candidate.relevance < 0.65
+        ) {
+          return false;
+        }
+
+        const requiredMatches =
+          location.locationType ===
+          "intersection"
+            ? Math.min(
+                2,
+                requestedTokens.length
+              )
+            : Math.min(
+                1,
+                requestedTokens.length
+              );
+
+        return (
+          candidate.tokenMatches >=
+          requiredMatches
+        );
+      })
       .sort(
         (first, second) =>
           second.tokenMatches -
@@ -626,65 +650,353 @@ async function geocodeLocation(
             second.distance
       );
 
-    const bestMatch = candidates[0];
+  const bestMatch =
+    candidates[0];
 
-    /*
-     * Do not return coordinates when MapTiler
-     * cannot find a reliable road/address/POI.
-     */
-    if (!bestMatch) {
-      return {
-        ...location,
-        geocoded: false,
-        latitude: null,
-        longitude: null,
-        mapLabel: "",
-        geocodingConfidence: 0
-      };
+  if (!bestMatch) {
+    return null;
+  }
+
+  return {
+    ...location,
+
+    geocoded: true,
+
+    latitude:
+      bestMatch.latitude,
+
+    longitude:
+      bestMatch.longitude,
+
+    mapLabel:
+      bestMatch.label ||
+      location.locationText,
+
+    geocodingConfidence:
+      bestMatch.relevance,
+
+    geocodingSource:
+      "maptiler"
+  };
+}
+
+function escapeRegex(value) {
+  return String(value || "")
+    .replace(
+      /[\\^$.*+?()[\]{}|]/g,
+      "\\$&"
+    );
+}
+
+function roadVariants(name) {
+  const original =
+    String(name || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (!original) {
+    return [];
+  }
+
+  const variants =
+    new Set([
+      original,
+
+      original.replace(
+        /\bSt\.?\b/gi,
+        "Street"
+      ),
+
+      original.replace(
+        /\bRd\.?\b/gi,
+        "Road"
+      ),
+
+      original.replace(
+        /\bAve\.?\b/gi,
+        "Avenue"
+      ),
+
+      original.replace(
+        /\bDr\.?\b/gi,
+        "Drive"
+      ),
+
+      original.replace(
+        /\bHwy\.?\b/gi,
+        "Highway"
+      )
+    ]);
+
+  return [...variants]
+    .filter(Boolean);
+}
+
+function overpassRoadUnion(
+  name,
+  setName
+) {
+  const boundingBox = [
+    BBOX.south,
+    BBOX.west,
+    BBOX.north,
+    BBOX.east
+  ].join(",");
+
+  const selectors =
+    roadVariants(name)
+      .map(
+        (variant) =>
+          `way["highway"]["name"~"^${escapeRegex(variant)}$",i](${boundingBox});`
+      );
+
+  const highwayNumber =
+    String(name).match(
+      /\b(?:highway|hwy|route)\s*(\d+[a-z]?)\b/i
+    )?.[1];
+
+  if (highwayNumber) {
+    selectors.push(
+      `way["highway"]["ref"~"(^|;[[:space:]]*)${escapeRegex(highwayNumber)}([[:space:]]*;|$)",i](${boundingBox});`
+    );
+  }
+
+  return (
+    `(${selectors.join("\n")})->.${setName};`
+  );
+}
+
+async function overpassIntersection(
+  location
+) {
+  if (
+    location.locationType !==
+    "intersection"
+  ) {
+    return null;
+  }
+
+  const roads =
+    splitIntersection(
+      location.locationText
+    );
+
+  if (!roads) {
+    return null;
+  }
+
+  const [
+    firstRoad,
+    secondRoad
+  ] = roads;
+
+  const query = [
+    "[out:json][timeout:15];",
+
+    overpassRoadUnion(
+      firstRoad,
+      "firstRoad"
+    ),
+
+    overpassRoadUnion(
+      secondRoad,
+      "secondRoad"
+    ),
+
+    "node(w.firstRoad)(w.secondRoad);",
+    "out body;"
+  ].join("\n");
+
+  try {
+    const response =
+      await fetch(
+        "https://overpass-api.de/api/interpreter",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded;charset=UTF-8",
+
+            "Accept":
+              "application/json"
+          },
+
+          body:
+            new URLSearchParams({
+              data: query
+            }).toString()
+        }
+      );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data =
+      await response.json();
+
+    const nodes =
+      (
+        Array.isArray(data?.elements)
+          ? data.elements
+          : []
+      )
+        .filter(
+          (item) =>
+            item?.type === "node"
+        )
+        .map((item) => ({
+          latitude:
+            Number(item.lat),
+
+          longitude:
+            Number(item.lon)
+        }))
+        .filter(
+          (item) =>
+            Number.isFinite(
+              item.latitude
+            ) &&
+            Number.isFinite(
+              item.longitude
+            )
+        )
+        .map((item) => ({
+          ...item,
+
+          distance:
+            kilometres(
+              CENTER.lat,
+              CENTER.lon,
+              item.latitude,
+              item.longitude
+            )
+        }))
+        .filter(
+          (item) =>
+            item.distance <= 160
+        )
+        .sort(
+          (first, second) =>
+            first.distance -
+            second.distance
+        );
+
+    const bestNode =
+      nodes[0];
+
+    if (!bestNode) {
+      return null;
     }
 
     return {
       ...location,
+
       geocoded: true,
-      latitude: bestMatch.latitude,
-      longitude: bestMatch.longitude,
+
+      latitude:
+        bestNode.latitude,
+
+      longitude:
+        bestNode.longitude,
 
       mapLabel:
-        getFeatureLabel(bestMatch.feature) ||
-        location.locationText,
+        `${firstRoad} & ${secondRoad}` +
+        (
+          location.municipality
+            ? `, ${location.municipality}`
+            : ""
+        ),
 
       geocodingConfidence:
-        bestMatch.relevance
+        0.92,
+
+      geocodingSource:
+        "openstreetmap"
     };
   } catch (error) {
     console.error(
-      "MapTiler geocoding error:",
+      "Overpass lookup failed:",
       error
     );
 
+    return null;
+  }
+}
+
+async function geocodeLocation(
+  location,
+  key
+) {
+  if (
+    !key ||
+    !location.hasLocation ||
+    location.confidence < 0.65
+  ) {
     return location;
   }
+
+  try {
+    const mapTilerResult =
+      await mapTilerLookup(
+        location,
+        key
+      );
+
+    if (mapTilerResult) {
+      return mapTilerResult;
+    }
+  } catch (error) {
+    console.error(
+      "MapTiler lookup failed:",
+      error
+    );
+  }
+
+  const intersectionResult =
+    await overpassIntersection(
+      location
+    );
+
+  if (intersectionResult) {
+    return intersectionResult;
+  }
+
+  return {
+    ...location,
+
+    geocoded: false,
+    latitude: null,
+    longitude: null,
+    mapLabel: "",
+    geocodingConfidence: 0,
+    geocodingSource: ""
+  };
 }
 
 export async function onRequestGet(
   context
 ) {
-  return jsonResponse({
+  return json({
     success: true,
 
     message:
-      "Peterborough Dispatch transcription, location and reliable geocoding endpoint is ready.",
+      "Peterborough Dispatch transcription, location and mapping endpoint is ready.",
 
-    aiBindingConnected: Boolean(
-      context.env.AI
-    ),
+    aiBindingConnected:
+      Boolean(context.env.AI),
 
-    mapTilerConnected: Boolean(
-      context.env.MAPTILER_KEY
-    ),
+    mapTilerConnected:
+      Boolean(
+        context.env.MAPTILER_KEY
+      ),
 
-    endpoint: "/api/audio",
-    time: new Date().toISOString()
+    endpoint:
+      "/api/audio",
+
+    time:
+      new Date().toISOString()
   });
 }
 
@@ -693,13 +1005,14 @@ export async function onRequestPost(
 ) {
   try {
     if (!context.env.AI) {
-      return jsonResponse(
+      return json(
         {
           success: false,
 
           error:
             "Cloudflare Workers AI is not connected."
         },
+
         500
       );
     }
@@ -707,17 +1020,24 @@ export async function onRequestPost(
     const contentType =
       context.request.headers.get(
         "Content-Type"
-      ) || "application/octet-stream";
+      ) ||
+      "application/octet-stream";
 
     const audioBuffer =
-      await context.request.arrayBuffer();
+      await context.request
+        .arrayBuffer();
 
-    if (audioBuffer.byteLength === 0) {
-      return jsonResponse(
+    if (
+      audioBuffer.byteLength === 0
+    ) {
+      return json(
         {
           success: false,
-          error: "No audio was received."
+
+          error:
+            "No audio was received."
         },
+
         400
       );
     }
@@ -726,50 +1046,56 @@ export async function onRequestPost(
       audioBuffer.byteLength >
       8 * 1024 * 1024
     ) {
-      return jsonResponse(
+      return json(
         {
           success: false,
 
           error:
             "The audio recording is too large."
         },
+
         413
       );
     }
 
-    const audioBase64 =
-      arrayBufferToBase64(audioBuffer);
-
     const transcription =
       await context.env.AI.run(
         "@cf/openai/whisper-large-v3-turbo",
+
         {
-          audio: audioBase64,
-          task: "transcribe",
-          language: "en",
-          vad_filter: true,
-          beam_size: 8,
+          audio:
+            toBase64(audioBuffer),
+
+          task:
+            "transcribe",
+
+          language:
+            "en",
+
+          vad_filter:
+            true,
+
+          beam_size:
+            8,
 
           condition_on_previous_text:
             true,
 
-          no_speech_threshold: 0.6,
+          no_speech_threshold:
+            0.6,
 
           initial_prompt:
             "Emergency services radio dispatch in Peterborough, Ontario, Canada. " +
-            "Speakers may use police, fire, EMS and OPP radio terminology, unit numbers, " +
-            "ten-codes and short clipped sentences. Common phrases include 10-4, copy, " +
-            "dispatch, respond, en route, scene, collision, traffic stop, ambulance, " +
-            "fire department and Peterborough Police. Possible locations include " +
-            "Lansdowne Street, Monaghan Road, Chemong Road, Parkhill Road, " +
-            "Ashburnham Drive, Water Street, George Street, Charlotte Street, " +
-            "Sherbrooke Street, Clonsilla Avenue, Television Road, Armour Road, " +
-            "The Parkway, Highway 7, Highway 28 and Highway 115."
+            "Speakers may use police, fire, EMS and OPP terminology, unit numbers, ten-codes and clipped sentences. " +
+            "Common local roads include Lansdowne Street, Monaghan Road, Chemong Road, Parkhill Road, " +
+            "Ashburnham Drive, Water Street, George Street, Charlotte Street, Sherbrooke Street, " +
+            "Clonsilla Avenue, Television Road, Armour Road, The Parkway, Highway 7, Highway 28 and Highway 115."
         }
       );
 
     const transcript =
-      typeof transcription?.text === "string"
+      typeof transcription?.text ===
+      "string"
         ? transcription.text.trim()
         : "";
 
@@ -785,7 +1111,7 @@ export async function onRequestPost(
         context.env.MAPTILER_KEY
       );
 
-    return jsonResponse({
+    return json({
       success: true,
       transcript,
       location,
@@ -797,7 +1123,9 @@ export async function onRequestPost(
         audioBuffer.byteLength,
 
       contentType,
-      time: new Date().toISOString()
+
+      time:
+        new Date().toISOString()
     });
   } catch (error) {
     console.error(
@@ -805,7 +1133,7 @@ export async function onRequestPost(
       error
     );
 
-    return jsonResponse(
+    return json(
       {
         success: false,
 
@@ -817,6 +1145,7 @@ export async function onRequestPost(
             ? error.message
             : "Unknown error"
       },
+
       500
     );
   }
