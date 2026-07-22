@@ -24,7 +24,24 @@ function safelySetPaint(
       value
     );
   } catch {
-    // Ignore unsupported paint properties.
+    // Ignore unsupported paint properties
+  }
+}
+
+function safelySetLayout(
+  map,
+  layerId,
+  property,
+  value
+) {
+  try {
+    map.setLayoutProperty(
+      layerId,
+      property,
+      value
+    );
+  } catch {
+    // Ignore unsupported layout properties
   }
 }
 
@@ -49,6 +66,56 @@ function applyNeonMapStyle(map) {
       `${layerId} ${sourceLayer}`
         .toLowerCase();
 
+    const isWater =
+      /water|ocean|lake|river|stream|reservoir|pond|basin|canal/.test(
+        description
+      );
+
+    const isBuilding =
+      /building/.test(
+        description
+      );
+
+    const isFieldOrLandPatch =
+      /park|wood|forest|grass|grassland|landcover|landuse|nature|green|farmland|farm|field|meadow|scrub|wetland|sand|beach|cemetery|golf|orchard|vineyard|allotment|crop|pasture/.test(
+        description
+      );
+
+    const isMajorRoad =
+      /motorway|trunk|primary|secondary|major|highway|freeway|expressway/.test(
+        description
+      );
+
+    const isLowUseRoad =
+      /service|track|alley|access|driveway|parking_aisle|parking-aisle|service-road|service_road/.test(
+        description
+      );
+
+    const isPathOrTrail =
+      /footway|footpath|path|trail|cycleway|pedestrian|steps|bridleway/.test(
+        description
+      );
+
+    const isResidentialRoad =
+      /residential|tertiary|minor|street|road|transportation|local/.test(
+        description
+      );
+
+    const isBoundary =
+      /boundary|administrative/.test(
+        description
+      );
+
+    const isRoadLabel =
+      /road|street|transportation|highway/.test(
+        description
+      );
+
+    const isMajorRoadLabel =
+      /motorway|trunk|primary|secondary|major|highway/.test(
+        description
+      );
+
     // BACKGROUND
     if (layer.type === "background") {
       safelySetPaint(
@@ -70,28 +137,12 @@ function applyNeonMapStyle(map) {
 
     // FILLS
     if (layer.type === "fill") {
-      const isWater =
-        /water|ocean|lake|river|stream|reservoir|pond|basin/.test(
-          description
-        );
-
-      const isFieldOrLandPatch =
-        /park|wood|forest|grass|landcover|nature|green|farmland|farm|field|meadow|scrub|wetland|sand|beach|cemetery|golf/.test(
-          description
-        );
-
-      const isBuilding =
-        /building/.test(
-          description
-        );
-
       if (isWater) {
-        // Slightly lighter dark blue
         safelySetPaint(
           map,
           layerId,
           "fill-color",
-          "#08182a"
+          "#0a1f36"
         );
 
         safelySetPaint(
@@ -105,12 +156,11 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "fill-outline-color",
-          "#08182a"
+          "#0a1f36"
         );
       } else if (
         isFieldOrLandPatch
       ) {
-        // Make all beige/field/green patches match background
         safelySetPaint(
           map,
           layerId,
@@ -178,6 +228,7 @@ function applyNeonMapStyle(map) {
       return;
     }
 
+    // 3D BUILDINGS
     if (
       layer.type ===
       "fill-extrusion"
@@ -199,38 +250,8 @@ function applyNeonMapStyle(map) {
       return;
     }
 
-    // LINES / ROADS
+    // ROADS / LINES
     if (layer.type === "line") {
-      const isMajorRoad =
-        /motorway|trunk|primary|secondary|major|highway|freeway|expressway/.test(
-          description
-        );
-
-      const isLowUseRoad =
-        /service|track|alley|access|driveway|parking_aisle|parking-aisle|service-road|service_road/.test(
-          description
-        );
-
-      const isPathOrTrail =
-        /footway|footpath|path|trail|cycleway|pedestrian|steps|bridleway/.test(
-          description
-        );
-
-      const isResidentialRoad =
-        /residential|tertiary|minor|street|road|transportation|local/.test(
-          description
-        );
-
-      const isWaterLine =
-        /river|stream|waterway|canal/.test(
-          description
-        );
-
-      const isBoundary =
-        /boundary|administrative/.test(
-          description
-        );
-
       if (isMajorRoad) {
         safelySetPaint(
           map,
@@ -243,21 +264,65 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-opacity",
-          0.9
+          0.88
         );
 
         safelySetPaint(
           map,
           layerId,
           "line-blur",
-          0.2
+          0.18
         );
       } else if (isLowUseRoad) {
         safelySetPaint(
           map,
           layerId,
           "line-color",
-          "#8059a8"
+          "#7b5aa0"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.78
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-blur",
+          0.12
+        );
+      } else if (isPathOrTrail) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#3a2a4a"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.4
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-blur",
+          0.08
+        );
+      } else if (
+        isResidentialRoad
+      ) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#2b7f99"
         );
 
         safelySetPaint(
@@ -271,51 +336,9 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-blur",
-          0.15
+          0.08
         );
-      } else if (isPathOrTrail) {
-        safelySetPaint(
-          map,
-          layerId,
-          "line-color",
-          "#3c294f"
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-opacity",
-          0.45
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-blur",
-          0.1
-        );
-      } else if (isResidentialRoad) {
-        safelySetPaint(
-          map,
-          layerId,
-          "line-color",
-          "#2b7f99"
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-opacity",
-          0.82
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-blur",
-          0.1
-        );
-      } else if (isWaterLine) {
+      } else if (isWater) {
         safelySetPaint(
           map,
           layerId,
@@ -327,7 +350,7 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-opacity",
-          0.7
+          0.65
         );
       } else if (isBoundary) {
         safelySetPaint(
@@ -348,31 +371,40 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-color",
-          "#1a1a1a"
+          "#171717"
         );
 
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
-          0.5
+          0.45
         );
       }
 
       return;
     }
 
-    // LABELS
+    // SYMBOLS / LABELS / ICONS
     if (layer.type === "symbol") {
-      const isRoadLabel =
-        /road|street|transportation|highway/.test(
-          description
+      // Hide field / grass / park style icon overlays that create beige patches
+      if (isFieldOrLandPatch) {
+        safelySetPaint(
+          map,
+          layerId,
+          "icon-opacity",
+          0
         );
 
-      const isMajorRoadLabel =
-        /motorway|trunk|primary|secondary|major|highway/.test(
-          description
+        safelySetPaint(
+          map,
+          layerId,
+          "text-opacity",
+          0
         );
+
+        return;
+      }
 
       safelySetPaint(
         map,
@@ -416,6 +448,7 @@ function applyNeonMapStyle(map) {
       return;
     }
 
+    // CIRCLES
     if (layer.type === "circle") {
       safelySetPaint(
         map,
@@ -429,6 +462,20 @@ function applyNeonMapStyle(map) {
         layerId,
         "circle-opacity",
         0.5
+      );
+    }
+
+    // EXTRA SAFETY:
+    // If any land patch layer slipped through as another type, hide it if needed
+    if (
+      isFieldOrLandPatch &&
+      layer.type === "raster"
+    ) {
+      safelySetLayout(
+        map,
+        layerId,
+        "visibility",
+        "none"
       );
     }
   });
@@ -740,44 +787,44 @@ function DispatchMap({
         bearing: 0
       });
 
-      mapRef.current = map;
+    mapRef.current = map;
 
-      map.addControl(
-        new maplibregl.NavigationControl(),
-        "top-right"
+    map.addControl(
+      new maplibregl.NavigationControl(),
+      "top-right"
+    );
+
+    map.addControl(
+      new maplibregl.FullscreenControl(),
+      "top-right"
+    );
+
+    map.on("load", () => {
+      applyNeonMapStyle(map);
+      updateMarkers(
+        incidentsRef.current
+      );
+    });
+
+    map.on("error", (event) => {
+      console.error(
+        "MapLibre error:",
+        event?.error || event
+      );
+    });
+
+    return () => {
+      markersRef.current.forEach(
+        (marker) => {
+          marker.remove();
+        }
       );
 
-      map.addControl(
-        new maplibregl.FullscreenControl(),
-        "top-right"
-      );
+      markersRef.current.clear();
 
-      map.on("load", () => {
-        applyNeonMapStyle(map);
-        updateMarkers(
-          incidentsRef.current
-        );
-      });
-
-      map.on("error", (event) => {
-        console.error(
-          "MapLibre error:",
-          event?.error || event
-        );
-      });
-
-      return () => {
-        markersRef.current.forEach(
-          (marker) => {
-            marker.remove();
-          }
-        );
-
-        markersRef.current.clear();
-
-        map.remove();
-        mapRef.current = null;
-      };
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
