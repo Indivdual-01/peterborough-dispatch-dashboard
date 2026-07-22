@@ -24,8 +24,8 @@ function safelySetPaint(
       value
     );
   } catch {
-    // Some map layers do not support every
-    // paint property. Those layers are skipped.
+    // Skip layers that do not support
+    // the requested paint property.
   }
 }
 
@@ -50,6 +50,10 @@ function applyNeonMapStyle(map) {
       `${layerId} ${sourceLayer}`
         .toLowerCase();
 
+    /*
+     * BLACK BACKGROUND
+     */
+
     if (layer.type === "background") {
       safelySetPaint(
         map,
@@ -68,37 +72,67 @@ function applyNeonMapStyle(map) {
       return;
     }
 
+    /*
+     * LAND, WATER, PARKS AND BUILDINGS
+     */
+
     if (layer.type === "fill") {
-      if (
-        /water|ocean|lake|river/.test(
+      const isWater =
+        /water|ocean|lake|river|stream|reservoir/.test(
           description
-        )
-      ) {
-        safelySetPaint(
-          map,
-          layerId,
-          "fill-color",
-          "#020512"
         );
-      } else if (
-        /park|wood|forest|grass|landcover/.test(
+
+      const isPark =
+        /park|wood|forest|grass|landcover|nature|green/.test(
           description
-        )
-      ) {
-        safelySetPaint(
-          map,
-          layerId,
-          "fill-color",
-          "#050008"
         );
-      } else if (
-        /building/.test(description)
-      ) {
+
+      const isBuilding =
+        /building/.test(
+          description
+        );
+
+      if (isWater) {
         safelySetPaint(
           map,
           layerId,
           "fill-color",
-          "#0b0610"
+          "#01030a"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-opacity",
+          1
+        );
+      } else if (isPark) {
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-color",
+          "#030007"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-opacity",
+          0.9
+        );
+      } else if (isBuilding) {
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-color",
+          "#09040d"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-opacity",
+          0.85
         );
       } else {
         safelySetPaint(
@@ -107,13 +141,20 @@ function applyNeonMapStyle(map) {
           "fill-color",
           "#000000"
         );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "fill-opacity",
+          1
+        );
       }
 
       safelySetPaint(
         map,
         layerId,
         "fill-outline-color",
-        "#190025"
+        "#160020"
       );
 
       return;
@@ -127,82 +168,222 @@ function applyNeonMapStyle(map) {
         map,
         layerId,
         "fill-extrusion-color",
-        "#0b0610"
+        "#09040d"
       );
 
       safelySetPaint(
         map,
         layerId,
         "fill-extrusion-opacity",
-        0.7
+        0.75
       );
 
       return;
     }
 
+    /*
+     * ROAD COLOURS
+     *
+     * Major roads:
+     * bright cloudy neon blue
+     *
+     * Residential and subdivision roads:
+     * softer blue
+     *
+     * Alleys, service roads, access lanes
+     * and rarely used roads:
+     * neon purple
+     *
+     * Paths and trails:
+     * dark purple
+     */
+
     if (layer.type === "line") {
-      const isRoad =
-        /road|street|transportation|motorway|trunk|primary|secondary|tertiary|residential|service|minor|highway/.test(
+      const isMajorRoad =
+        /motorway|trunk|primary|secondary|major|highway|freeway|expressway/.test(
           description
         );
 
-      const isMainRoad =
-        /motorway|trunk|primary|secondary|major|highway/.test(
+      const isLowUseRoad =
+        /service|track|alley|access|driveway|parking_aisle|parking-aisle|service-road|service_road/.test(
           description
         );
 
-      if (isRoad) {
+      const isPathOrTrail =
+        /footway|footpath|path|trail|cycleway|pedestrian|steps|bridleway/.test(
+          description
+        );
+
+      const isResidentialRoad =
+        /residential|tertiary|minor|street|road|transportation|local/.test(
+          description
+        );
+
+      const isWaterLine =
+        /river|stream|waterway|canal/.test(
+          description
+        );
+
+      const isBoundary =
+        /boundary|administrative/.test(
+          description
+        );
+
+      if (isMajorRoad) {
         safelySetPaint(
           map,
           layerId,
           "line-color",
-          isMainRoad
-            ? "#00d9ff"
-            : "#b100ff"
+          "#19dfff"
         );
 
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
-          isMainRoad
-            ? 1
-            : 0.95
+          1
         );
 
         safelySetPaint(
           map,
           layerId,
           "line-blur",
-          isMainRoad
-            ? 0.75
-            : 0.45
+          0.8
         );
-      } else {
+      } else if (isLowUseRoad) {
         safelySetPaint(
           map,
           layerId,
           "line-color",
-          "#250035"
+          "#b400ff"
         );
 
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
-          0.7
+          0.95
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-blur",
+          0.5
+        );
+      } else if (isPathOrTrail) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#47005f"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.55
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-blur",
+          0.2
+        );
+      } else if (isResidentialRoad) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#087fa8"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.9
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-blur",
+          0.25
+        );
+      } else if (isWaterLine) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#041e31"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.65
+        );
+      } else if (isBoundary) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#29003d"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.4
+        );
+      } else {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#180024"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.55
         );
       }
 
       return;
     }
 
+    /*
+     * LABELS
+     */
+
     if (layer.type === "symbol") {
+      const isRoadLabel =
+        /road|street|transportation|highway/.test(
+          description
+        );
+
+      const isMajorRoadLabel =
+        /motorway|trunk|primary|secondary|major|highway/.test(
+          description
+        );
+
       safelySetPaint(
         map,
         layerId,
         "text-color",
-        "#ffffff"
+        isMajorRoadLabel
+          ? "#b8f7ff"
+          : isRoadLabel
+            ? "#e4d7ff"
+            : "#ffffff"
       );
 
       safelySetPaint(
@@ -216,14 +397,14 @@ function applyNeonMapStyle(map) {
         map,
         layerId,
         "text-halo-width",
-        1.5
+        1.6
       );
 
       safelySetPaint(
         map,
         layerId,
         "text-halo-blur",
-        0.5
+        0.6
       );
 
       safelySetPaint(
@@ -241,14 +422,14 @@ function applyNeonMapStyle(map) {
         map,
         layerId,
         "circle-color",
-        "#8d00cc"
+        "#8e00c7"
       );
 
       safelySetPaint(
         map,
         layerId,
         "circle-opacity",
-        0.6
+        0.55
       );
     }
   });
@@ -265,10 +446,10 @@ function getMarkerColor(
       return "#ff9500";
 
     case "highway":
-      return "#00d9ff";
+      return "#19dfff";
 
     case "road":
-      return "#b100ff";
+      return "#00a8e8";
 
     case "landmark":
       return "#39ff88";
