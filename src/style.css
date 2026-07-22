@@ -2,29 +2,28 @@
   box-sizing: border-box;
 }
 
-
 html,
 body,
 #root {
-
+  width: 100%;
+  height: 100%;
   margin: 0;
   padding: 0;
 
-  width: 100%;
-  height: 100%;
-
-  background: #050505;
+  background: #000000;
+  color: #ffffff;
 
   font-family:
     "Segoe UI",
     Arial,
     sans-serif;
-
 }
 
+body {
+  overflow: hidden;
+}
 
 .app {
-
   display: flex;
 
   width: 100%;
@@ -32,187 +31,528 @@ body,
 
   overflow: hidden;
 
-  background: #050505;
-
+  background: #000000;
 }
 
-
-/* LEFT PANEL */
+/* SIDEBAR */
 
 .sidebar {
+  display: flex;
+  flex-direction: column;
 
-  width: 340px;
-
+  width: 360px;
+  min-width: 360px;
   height: 100vh;
 
-  padding: 25px;
+  padding: 22px;
+  gap: 12px;
+
+  overflow: hidden;
 
   background:
     linear-gradient(
       180deg,
-      #111111,
-      #080808
+      #08000c 0%,
+      #000000 55%,
+      #030008 100%
     );
 
   border-right:
-    1px solid rgba(0,183,255,0.4);
-
+    1px solid
+    rgba(0, 217, 255, 0.7);
 
   box-shadow:
-    0 0 25px
-    rgba(0,183,255,0.15);
-
-
-  color:white;
+    8px 0 30px
+    rgba(0, 217, 255, 0.12);
 
   z-index: 5;
-
 }
-
 
 .sidebar h1 {
+  margin: 0 0 4px;
 
-  color:#00b7ff;
+  color: #00d9ff;
+
+  font-size: 25px;
+  line-height: 1.1;
 
   text-shadow:
-    0 0 10px #00b7ff;
-
-  font-size:26px;
-
+    0 0 8px #00d9ff,
+    0 0 18px
+    rgba(0, 217, 255, 0.6);
 }
-
 
 .status {
+  color: #39ff88;
 
-  margin:20px 0;
-
-  color:#00ff99;
+  font-weight: 600;
 
   text-shadow:
-    0 0 10px #00ff99;
-
+    0 0 10px
+    rgba(57, 255, 136, 0.8);
 }
-
 
 .sidebar input {
+  width: 100%;
+  padding: 12px 14px;
 
-  width:100%;
-
-  padding:12px;
-
-  margin-bottom:15px;
-
-  background:#050505;
-
-  color:white;
+  background: #020204;
+  color: #ffffff;
 
   border:
+    1px solid #00d9ff;
 
-  1px solid #00b7ff;
+  border-radius: 8px;
 
+  outline: none;
 
-  border-radius:8px;
-
+  box-shadow:
+    inset 0 0 12px
+    rgba(0, 217, 255, 0.08);
 }
 
+.sidebar input:focus {
+  border-color: #b100ff;
+
+  box-shadow:
+    0 0 12px
+    rgba(177, 0, 255, 0.5);
+}
 
 .sidebar button {
-
-  width:100%;
-
-  padding:14px;
-
-  background:#111;
-
-  color:#00b7ff;
-
-  border:
-
-  1px solid #00b7ff;
-
-
-  border-radius:8px;
-
-
-  cursor:pointer;
-
-
-  box-shadow:
-
-  0 0 15px
-  rgba(0,183,255,.4);
-
-
-}
-
-
-.panel {
-
-  margin-top:20px;
-
-  padding:15px;
-
-
-  min-height:90px;
-
+  width: 100%;
+  padding: 13px;
 
   background:
+    linear-gradient(
+      90deg,
+      rgba(0, 217, 255, 0.11),
+      rgba(177, 0, 255, 0.12)
+    );
 
-  rgba(255,255,255,0.05);
-
+  color: #ffffff;
 
   border:
+    1px solid #00d9ff;
 
-  1px solid rgba(155,48,255,.5);
+  border-radius: 8px;
 
-
-  border-radius:10px;
-
-
-  color:#ddd;
-
+  font-weight: 700;
+  cursor: pointer;
 
   box-shadow:
+    0 0 14px
+    rgba(0, 217, 255, 0.3);
 
-  0 0 15px
-  rgba(155,48,255,.25);
-
-
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
+.sidebar button:hover {
+  transform:
+    translateY(-1px);
+
+  border-color: #b100ff;
+
+  box-shadow:
+    0 0 18px
+    rgba(177, 0, 255, 0.45);
+}
+
+.audio-status {
+  color: #9feeff;
+  font-size: 13px;
+}
+
+.audio-error {
+  padding: 9px;
+
+  color: #ff8299;
+  background:
+    rgba(255, 45, 85, 0.1);
+
+  border:
+    1px solid
+    rgba(255, 45, 85, 0.5);
+
+  border-radius: 6px;
+
+  font-size: 13px;
+}
+
+/* PANELS */
+
+.panel {
+  min-height: 0;
+  padding: 14px;
+
+  background:
+    rgba(8, 0, 14, 0.88);
+
+  border:
+    1px solid
+    rgba(177, 0, 255, 0.65);
+
+  border-radius: 10px;
+
+  color: #eaeaea;
+
+  box-shadow:
+    0 0 16px
+    rgba(177, 0, 255, 0.18);
+
+  overflow: hidden;
+}
+
+.panel h2 {
+  margin:
+    0 0 10px;
+
+  color: #c552ff;
+
+  font-size: 18px;
+
+  text-shadow:
+    0 0 8px
+    rgba(177, 0, 255, 0.65);
+}
+
+/*
+  The Events panel fills the available
+  sidebar space. The mouse wheel scrolls
+  through the event history.
+*/
+
+.transcript-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+
+  min-height: 170px;
+}
+
+.transcript-list {
+  flex: 1;
+  min-height: 0;
+
+  padding-right: 7px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  overscroll-behavior:
+    contain;
+
+  scrollbar-width: thin;
+
+  scrollbar-color:
+    #b100ff #09000f;
+}
+
+.transcript-list::-webkit-scrollbar,
+.incident-list::-webkit-scrollbar {
+  width: 9px;
+}
+
+.transcript-list::-webkit-scrollbar-track,
+.incident-list::-webkit-scrollbar-track {
+  background: #09000f;
+
+  border-radius: 10px;
+}
+
+.transcript-list::-webkit-scrollbar-thumb,
+.incident-list::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(
+      180deg,
+      #00d9ff,
+      #b100ff
+    );
+
+  border-radius: 10px;
+
+  border:
+    2px solid #09000f;
+}
+
+.transcript-item {
+  padding:
+    10px 0 12px;
+
+  border-bottom:
+    1px solid
+    rgba(177, 0, 255, 0.25);
+}
+
+.transcript-item:last-child {
+  border-bottom: 0;
+}
+
+.transcript-time {
+  color: #00d9ff;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  text-shadow:
+    0 0 6px
+    rgba(0, 217, 255, 0.6);
+}
+
+.transcript-item p {
+  margin:
+    6px 0;
+
+  color: #f4f4f4;
+
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.detected-location {
+  color: #df9aff;
+
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* RECENT INCIDENTS */
+
+.incidents-panel {
+  display: flex;
+  flex-direction: column;
+
+  min-height: 150px;
+  max-height: 27vh;
+}
+
+.incident-list {
+  min-height: 0;
+  padding-right: 7px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  overscroll-behavior:
+    contain;
+
+  scrollbar-width: thin;
+
+  scrollbar-color:
+    #00d9ff #09000f;
+}
+
+.incident-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  padding:
+    9px 0;
+
+  border-bottom:
+    1px solid
+    rgba(0, 217, 255, 0.22);
+}
+
+.incident-item:last-child {
+  border-bottom: 0;
+}
+
+.incident-item strong {
+  color: #ffffff;
+
+  font-size: 13px;
+}
+
+.incident-item span {
+  color: #00d9ff;
+
+  font-size: 11px;
+}
+
+.incident-item small {
+  color: #bd87d8;
+
+  font-size: 11px;
+}
+
+.empty-message {
+  color: #858585;
+
+  font-size: 13px;
+}
 
 /* MAP */
 
 .map {
+  flex: 1;
+  height: 100%;
 
-  flex:1;
-
-  height:100%;
-
+  background: #000000;
 }
 
-
-/* MapLibre controls */
-
-.maplibregl-ctrl {
-
-  background:#111 !important;
-
+.maplibregl-canvas {
+  background: #000000;
 }
 
+.maplibregl-marker {
+  filter:
+    drop-shadow(
+      0 0 6px
+      rgba(0, 217, 255, 0.9)
+    )
+    drop-shadow(
+      0 0 12px
+      rgba(177, 0, 255, 0.55)
+    );
+}
+
+/* MAP CONTROLS */
+
+.maplibregl-ctrl-group {
+  overflow: hidden;
+
+  background: #050008 !important;
+
+  border:
+    1px solid
+    rgba(0, 217, 255, 0.6);
+
+  border-radius: 8px !important;
+
+  box-shadow:
+    0 0 14px
+    rgba(0, 217, 255, 0.3)
+    !important;
+}
 
 .maplibregl-ctrl button {
-
-  background:#111 !important;
-
+  background: #050008 !important;
 }
-
 
 .maplibregl-ctrl button span {
-
   filter:
-
-  invert(1);
-
+    invert(1)
+    drop-shadow(
+      0 0 3px #00d9ff
+    );
 }
-/* Peterborough Neon Dashboard */
+
+/* POPUPS */
+
+.maplibregl-popup-content {
+  padding: 14px;
+
+  background: #08000d;
+  color: #ffffff;
+
+  border:
+    1px solid #b100ff;
+
+  border-radius: 9px;
+
+  box-shadow:
+    0 0 20px
+    rgba(177, 0, 255, 0.45);
+}
+
+.maplibregl-popup-tip {
+  border-top-color:
+    #08000d !important;
+
+  border-bottom-color:
+    #08000d !important;
+}
+
+.maplibregl-popup-close-button {
+  color: #ffffff;
+
+  font-size: 19px;
+}
+
+.incident-popup {
+  max-width: 280px;
+}
+
+.incident-popup strong {
+  color: #00d9ff;
+
+  font-size: 14px;
+
+  text-shadow:
+    0 0 7px
+    rgba(0, 217, 255, 0.65);
+}
+
+.incident-popup-time {
+  margin-top: 5px;
+
+  color: #d083ff;
+
+  font-size: 11px;
+}
+
+.incident-popup p {
+  margin:
+    9px 0;
+
+  color: #efefef;
+
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.incident-popup small {
+  color: #bdbdbd;
+
+  font-size: 10px;
+}
+
+/* SMALLER SCREENS */
+
+@media (
+  max-width: 850px
+) {
+  body {
+    overflow: auto;
+  }
+
+  .app {
+    flex-direction: column;
+
+    height: auto;
+    min-height: 100vh;
+
+    overflow: visible;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+
+    max-height: 58vh;
+
+    border-right: 0;
+
+    border-bottom:
+      1px solid
+      rgba(0, 217, 255, 0.7);
+  }
+
+  .map {
+    min-height: 55vh;
+  }
+
+  .transcript-panel {
+    min-height: 180px;
+  }
+
+  .incidents-panel {
+    max-height: 180px;
+  }
+}
