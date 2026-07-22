@@ -19,13 +19,12 @@ function safelySetPaint(
 ) {
   try {
     map.setPaintProperty(
-      layerId,
+      map && layerId ? layerId : "",
       property,
       value
     );
   } catch {
-    // Skip layers that do not support
-    // the requested paint property.
+    // Skip unsupported paint properties.
   }
 }
 
@@ -50,10 +49,6 @@ function applyNeonMapStyle(map) {
       `${layerId} ${sourceLayer}`
         .toLowerCase();
 
-    /*
-     * BLACK BACKGROUND
-     */
-
     if (layer.type === "background") {
       safelySetPaint(
         map,
@@ -71,10 +66,6 @@ function applyNeonMapStyle(map) {
 
       return;
     }
-
-    /*
-     * LAND, WATER, PARKS AND BUILDINGS
-     */
 
     if (layer.type === "fill") {
       const isWater =
@@ -97,7 +88,7 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "fill-color",
-          "#01030a"
+          "#05070d"
         );
 
         safelySetPaint(
@@ -111,28 +102,28 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "fill-color",
-          "#030007"
+          "#d9dcc7"
         );
 
         safelySetPaint(
           map,
           layerId,
           "fill-opacity",
-          0.9
+          1
         );
       } else if (isBuilding) {
         safelySetPaint(
           map,
           layerId,
           "fill-color",
-          "#09040d"
+          "#070707"
         );
 
         safelySetPaint(
           map,
           layerId,
           "fill-opacity",
-          0.85
+          0.95
         );
       } else {
         safelySetPaint(
@@ -154,7 +145,7 @@ function applyNeonMapStyle(map) {
         map,
         layerId,
         "fill-outline-color",
-        "#160020"
+        "#101010"
       );
 
       return;
@@ -168,7 +159,7 @@ function applyNeonMapStyle(map) {
         map,
         layerId,
         "fill-extrusion-color",
-        "#09040d"
+        "#080808"
       );
 
       safelySetPaint(
@@ -180,23 +171,6 @@ function applyNeonMapStyle(map) {
 
       return;
     }
-
-    /*
-     * ROAD COLOURS
-     *
-     * Major roads:
-     * bright cloudy neon blue
-     *
-     * Residential and subdivision roads:
-     * softer blue
-     *
-     * Alleys, service roads, access lanes
-     * and rarely used roads:
-     * neon purple
-     *
-     * Paths and trails:
-     * dark purple
-     */
 
     if (layer.type === "line") {
       const isMajorRoad =
@@ -234,70 +208,7 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-color",
-          "#19dfff"
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-opacity",
-          1
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-blur",
-          0.8
-        );
-      } else if (isLowUseRoad) {
-        safelySetPaint(
-          map,
-          layerId,
-          "line-color",
-          "#b400ff"
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-opacity",
-          0.95
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-blur",
-          0.5
-        );
-      } else if (isPathOrTrail) {
-        safelySetPaint(
-          map,
-          layerId,
-          "line-color",
-          "#47005f"
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-opacity",
-          0.55
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "line-blur",
-          0.2
-        );
-      } else if (isResidentialRoad) {
-        safelySetPaint(
-          map,
-          layerId,
-          "line-color",
-          "#087fa8"
+          "#43b8d6"
         );
 
         safelySetPaint(
@@ -311,14 +222,77 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-blur",
-          0.25
+          0.2
+        );
+      } else if (isLowUseRoad) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#8059a8"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.8
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-blur",
+          0.15
+        );
+      } else if (isPathOrTrail) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#3c294f"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.45
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-blur",
+          0.1
+        );
+      } else if (isResidentialRoad) {
+        safelySetPaint(
+          map,
+          layerId,
+          "line-color",
+          "#2b7f99"
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-opacity",
+          0.82
+        );
+
+        safelySetPaint(
+          map,
+          layerId,
+          "line-blur",
+          0.1
         );
       } else if (isWaterLine) {
         safelySetPaint(
           map,
           layerId,
           "line-color",
-          "#041e31"
+          "#102433"
         );
 
         safelySetPaint(
@@ -332,37 +306,33 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-color",
-          "#29003d"
+          "#222222"
         );
 
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
-          0.4
+          0.35
         );
       } else {
         safelySetPaint(
           map,
           layerId,
           "line-color",
-          "#180024"
+          "#1a1a1a"
         );
 
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
-          0.55
+          0.5
         );
       }
 
       return;
     }
-
-    /*
-     * LABELS
-     */
 
     if (layer.type === "symbol") {
       const isRoadLabel =
@@ -380,9 +350,9 @@ function applyNeonMapStyle(map) {
         layerId,
         "text-color",
         isMajorRoadLabel
-          ? "#b8f7ff"
+          ? "#f2f2f2"
           : isRoadLabel
-            ? "#e4d7ff"
+            ? "#d8d8d8"
             : "#ffffff"
       );
 
@@ -397,14 +367,14 @@ function applyNeonMapStyle(map) {
         map,
         layerId,
         "text-halo-width",
-        1.6
+        1.4
       );
 
       safelySetPaint(
         map,
         layerId,
         "text-halo-blur",
-        0.6
+        0.5
       );
 
       safelySetPaint(
@@ -422,14 +392,14 @@ function applyNeonMapStyle(map) {
         map,
         layerId,
         "circle-color",
-        "#8e00c7"
+        "#6e5b8b"
       );
 
       safelySetPaint(
         map,
         layerId,
         "circle-opacity",
-        0.55
+        0.5
       );
     }
   });
@@ -440,19 +410,19 @@ function getMarkerColor(
 ) {
   switch (locationType) {
     case "intersection":
-      return "#ff2d55";
+      return "#ff6a3d";
 
     case "address":
-      return "#ff9500";
+      return "#f2a65a";
 
     case "highway":
-      return "#19dfff";
+      return "#43b8d6";
 
     case "road":
-      return "#00a8e8";
+      return "#2b7f99";
 
     case "landmark":
-      return "#39ff88";
+      return "#8bcf9b";
 
     default:
       return "#ffffff";
@@ -596,7 +566,6 @@ function DispatchMap({
       (marker, id) => {
         if (!currentIds.has(id)) {
           marker.remove();
-
           markersRef.current.delete(
             id
           );
@@ -711,7 +680,6 @@ function DispatchMap({
         longitude,
         latitude
       ],
-
       zoom: 15,
       speed: 0.8,
       essential: true
@@ -737,13 +705,10 @@ function DispatchMap({
       new maplibregl.Map({
         container:
           mapContainerRef.current,
-
         style:
           "https://tiles.openfreemap.org/styles/liberty",
-
         center:
           PETERBOROUGH_CENTER,
-
         zoom: 12,
         minZoom: 8,
         maxZoom: 19,
@@ -754,37 +719,28 @@ function DispatchMap({
     mapRef.current = map;
 
     map.addControl(
-      new maplibregl
-        .NavigationControl(),
-
+      new maplibregl.NavigationControl(),
       "top-right"
     );
 
     map.addControl(
-      new maplibregl
-        .FullscreenControl(),
-
+      new maplibregl.FullscreenControl(),
       "top-right"
     );
 
     map.on("load", () => {
       applyNeonMapStyle(map);
-
       updateMarkers(
         incidentsRef.current
       );
     });
 
-    map.on(
-      "error",
-      (event) => {
-        console.error(
-          "MapLibre error:",
-          event?.error ||
-          event
-        );
-      }
-    );
+    map.on("error", (event) => {
+      console.error(
+        "MapLibre error:",
+        event?.error || event
+      );
+    });
 
     return () => {
       markersRef.current.forEach(
