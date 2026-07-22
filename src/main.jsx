@@ -200,7 +200,7 @@ function App() {
       [
         newTranscript,
         ...previous
-      ].slice(0, 12)
+      ].slice(0, 50)
     );
 
     addMappedIncident(
@@ -327,11 +327,11 @@ function App() {
         )}
 
         <div className="panel transcript-panel">
-          <h2>AI Transcript</h2>
+          <h2>Events</h2>
 
           {transcripts.length === 0 ? (
             <p className="empty-message">
-              No speech transcribed yet.
+              No events detected yet.
             </p>
           ) : (
             <div className="transcript-list">
