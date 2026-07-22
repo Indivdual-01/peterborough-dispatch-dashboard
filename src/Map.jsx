@@ -4,7 +4,6 @@ import React, {
 } from "react";
 
 import maplibregl from "maplibre-gl";
-
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const PETERBOROUGH_CENTER = [
@@ -12,7 +11,7 @@ const PETERBOROUGH_CENTER = [
   44.3091
 ];
 
-function markerColor(locationType) {
+function getMarkerColor(locationType) {
   switch (locationType) {
     case "intersection":
       return "#ff3b30";
@@ -34,7 +33,7 @@ function markerColor(locationType) {
   }
 }
 
-function percentage(value) {
+function formatPercentage(value) {
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
@@ -61,16 +60,18 @@ function createPopupContent(incident) {
 
   container.appendChild(title);
 
-  const time =
-    document.createElement("div");
+  if (incident.time) {
+    const time =
+      document.createElement("div");
 
-  time.className =
-    "incident-popup-time";
+    time.className =
+      "incident-popup-time";
 
-  time.textContent =
-    incident.time || "";
+    time.textContent =
+      incident.time;
 
-  container.appendChild(time);
+    container.appendChild(time);
+  }
 
   if (incident.transcript) {
     const transcript =
@@ -86,24 +87,22 @@ function createPopupContent(incident) {
     document.createElement("small");
 
   confidence.textContent =
-    `Location confidence: ${percentage(
+    `Location confidence: ${formatPercentage(
       incident.confidence
     )}`;
 
   container.appendChild(confidence);
 
   if (incident.geocodingSource) {
+    container.appendChild(
+      document.createElement("br")
+    );
+
     const source =
       document.createElement("small");
 
     source.textContent =
-      `Map source: ${
-        incident.geocodingSource
-      }`;
-
-    container.appendChild(
-      document.createElement("br")
-    );
+      `Map source: ${incident.geocodingSource}`;
 
     container.appendChild(source);
   }
@@ -111,17 +110,21 @@ function createPopupContent(incident) {
   return container;
 }
 
-function Map({ incidents = [] }) {
-  const mapContainer =
+function DispatchMap({
+  incidents = []
+}) {
+  const mapContainerRef =
     useRef(null);
 
-  const map =
+  const mapRef =
     useRef(null);
 
-  const markers =
-    useRef(new Map());
+  const markersRef =
+    useRef(
+      new globalThis.Map()
+    );
 
-  const latestIncidentId =
+  const latestIncidentIdRef =
     useRef("");
 
   const incidentsRef =
@@ -135,9 +138,12 @@ function Map({ incidents = [] }) {
   function updateMarkers(
     currentIncidents
   ) {
+    const map =
+      mapRef.current;
+
     if (
-      !map.current ||
-      !map.current.loaded()
+      !map ||
+      !map.loaded()
     ) {
       return;
     }
@@ -150,15 +156,14 @@ function Map({ incidents = [] }) {
         )
       );
 
-    /*
-     * Remove markers that are no longer
-     * present in Recent Incidents.
-     */
-    markers.current.forEach(
+    markersRef.current.forEach(
       (marker, id) => {
         if (!currentIds.has(id)) {
           marker.remove();
-          markers.current.delete(id);
+
+          markersRef.current.delete(
+            id
+          );
         }
       }
     );
@@ -187,26 +192,25 @@ function Map({ incidents = [] }) {
           latitude
         ];
 
+        const popup =
+          new maplibregl.Popup({
+            offset: 28,
+            closeButton: true
+          }).setDOMContent(
+            createPopupContent(
+              incident
+            )
+          );
+
         const existingMarker =
-          markers.current.get(
+          markersRef.current.get(
             incident.id
           );
 
         if (existingMarker) {
           existingMarker
-            .setLngLat(coordinates);
-
-          existingMarker
-            .setPopup(
-              new maplibregl.Popup({
-                offset: 28,
-                closeButton: true
-              }).setDOMContent(
-                createPopupContent(
-                  incident
-                )
-              )
-            );
+            .setLngLat(coordinates)
+            .setPopup(popup);
 
           return;
         }
@@ -214,92 +218,85 @@ function Map({ incidents = [] }) {
         const marker =
           new maplibregl.Marker({
             color:
-              markerColor(
+              getMarkerColor(
                 incident.locationType
               )
           })
             .setLngLat(coordinates)
-            .setPopup(
-              new maplibregl.Popup({
-                offset: 28,
-                closeButton: true
-              }).setDOMContent(
-                createPopupContent(
-                  incident
-                )
-              )
-            )
-            .addTo(map.current);
+            .setPopup(popup)
+            .addTo(map);
 
-        markers.current.set(
+        markersRef.current.set(
           incident.id,
           marker
         );
       }
     );
 
-    /*
-     * The newest incident is first in
-     * the incidents array.
-     */
     const newestIncident =
       currentIncidents[0];
 
     if (
-      newestIncident &&
-      newestIncident.id !==
-        latestIncidentId.current
+      !newestIncident ||
+      newestIncident.id ===
+        latestIncidentIdRef.current
     ) {
-      const latitude =
-        Number(
-          newestIncident.latitude
-        );
+      return;
+    }
 
-      const longitude =
-        Number(
-          newestIncident.longitude
-        );
+    const latitude =
+      Number(
+        newestIncident.latitude
+      );
 
-      if (
-        Number.isFinite(latitude) &&
-        Number.isFinite(longitude)
-      ) {
-        latestIncidentId.current =
-          newestIncident.id;
+    const longitude =
+      Number(
+        newestIncident.longitude
+      );
 
-        map.current.flyTo({
-          center: [
-            longitude,
-            latitude
-          ],
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      return;
+    }
 
-          zoom: 15,
-          speed: 0.8,
-          essential: true
-        });
+    latestIncidentIdRef.current =
+      newestIncident.id;
 
-        const marker =
-          markers.current.get(
-            newestIncident.id
-          );
+    map.flyTo({
+      center: [
+        longitude,
+        latitude
+      ],
 
-        marker?.togglePopup();
-      }
+      zoom: 15,
+      speed: 0.8,
+      essential: true
+    });
+
+    const newestMarker =
+      markersRef.current.get(
+        newestIncident.id
+      );
+
+    if (newestMarker) {
+      newestMarker.togglePopup();
     }
   }
 
   useEffect(() => {
     if (
-      map.current ||
-      !mapContainer.current
+      mapRef.current ||
+      !mapContainerRef.current
     ) {
       return;
     }
 
-    const mapInstance =
+    const map =
       new maplibregl.Map({
         container:
-          mapContainer.current,
+          mapContainerRef.current,
 
         style:
           "https://tiles.openfreemap.org/styles/liberty",
@@ -314,24 +311,24 @@ function Map({ incidents = [] }) {
         bearing: 0
       });
 
-    map.current =
-      mapInstance;
+    mapRef.current =
+      map;
 
-    mapInstance.addControl(
+    map.addControl(
       new maplibregl
         .NavigationControl(),
 
       "top-right"
     );
 
-    mapInstance.addControl(
+    map.addControl(
       new maplibregl
         .FullscreenControl(),
 
       "top-right"
     );
 
-    mapInstance.on(
+    map.on(
       "load",
       () => {
         updateMarkers(
@@ -340,26 +337,29 @@ function Map({ incidents = [] }) {
       }
     );
 
-    mapInstance.on(
+    map.on(
       "error",
       (event) => {
         console.error(
-          "Map loading error:",
-          event.error
+          "MapLibre error:",
+          event?.error ||
+          event
         );
       }
     );
 
     return () => {
-      markers.current.forEach(
-        (marker) =>
-          marker.remove()
+      markersRef.current.forEach(
+        (marker) => {
+          marker.remove();
+        }
       );
 
-      markers.current.clear();
+      markersRef.current.clear();
 
-      mapInstance.remove();
-      map.current = null;
+      map.remove();
+
+      mapRef.current = null;
     };
   }, []);
 
@@ -369,10 +369,10 @@ function Map({ incidents = [] }) {
 
   return (
     <div
-      ref={mapContainer}
+      ref={mapContainerRef}
       className="map"
     />
   );
 }
 
-export default Map;
+export default DispatchMap;
