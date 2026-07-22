@@ -49,10 +49,7 @@ function applyNeonMapStyle(map) {
       `${layerId} ${sourceLayer}`
         .toLowerCase();
 
-    /*
-     * BACKGROUND
-     */
-
+    // BACKGROUND
     if (layer.type === "background") {
       safelySetPaint(
         map,
@@ -71,21 +68,15 @@ function applyNeonMapStyle(map) {
       return;
     }
 
-    /*
-     * FILLS
-     * - water: very dark blue
-     * - parks/green/beige patches: black
-     * - buildings: very dark grey
-     */
-
+    // FILLS
     if (layer.type === "fill") {
       const isWater =
         /water|ocean|lake|river|stream|reservoir|pond|basin/.test(
           description
         );
 
-      const isParkOrLandPatch =
-        /park|wood|forest|grass|landcover|nature|green|farmland|meadow|scrub|wetland|sand|beach|cemetery|golf/.test(
+      const isFieldOrLandPatch =
+        /park|wood|forest|grass|landcover|nature|green|farmland|farm|field|meadow|scrub|wetland|sand|beach|cemetery|golf/.test(
           description
         );
 
@@ -95,11 +86,12 @@ function applyNeonMapStyle(map) {
         );
 
       if (isWater) {
+        // Slightly lighter dark blue
         safelySetPaint(
           map,
           layerId,
           "fill-color",
-          "#020611"
+          "#08182a"
         );
 
         safelySetPaint(
@@ -113,11 +105,12 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "fill-outline-color",
-          "#020611"
+          "#08182a"
         );
       } else if (
-        isParkOrLandPatch
+        isFieldOrLandPatch
       ) {
+        // Make all beige/field/green patches match background
         safelySetPaint(
           map,
           layerId,
@@ -143,7 +136,7 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "fill-color",
-          "#171717"
+          "#181818"
         );
 
         safelySetPaint(
@@ -157,7 +150,7 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "fill-outline-color",
-          "#1d1d1d"
+          "#202020"
         );
       } else {
         safelySetPaint(
@@ -206,11 +199,7 @@ function applyNeonMapStyle(map) {
       return;
     }
 
-    /*
-     * ROADS
-     * toned-down neon
-     */
-
+    // LINES / ROADS
     if (layer.type === "line") {
       const isMajorRoad =
         /motorway|trunk|primary|secondary|major|highway|freeway|expressway/.test(
@@ -331,7 +320,7 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-color",
-          "#0b1422"
+          "#12314b"
         );
 
         safelySetPaint(
@@ -373,10 +362,7 @@ function applyNeonMapStyle(map) {
       return;
     }
 
-    /*
-     * LABELS
-     */
-
+    // LABELS
     if (layer.type === "symbol") {
       const isRoadLabel =
         /road|street|transportation|highway/.test(
@@ -454,19 +440,14 @@ function getMarkerColor(
   switch (locationType) {
     case "intersection":
       return "#ff6a3d";
-
     case "address":
       return "#f2a65a";
-
     case "highway":
       return "#43b8d6";
-
     case "road":
       return "#2b7f99";
-
     case "landmark":
       return "#8bcf9b";
-
     default:
       return "#ffffff";
   }
@@ -759,44 +740,44 @@ function DispatchMap({
         bearing: 0
       });
 
-    mapRef.current = map;
+      mapRef.current = map;
 
-    map.addControl(
-      new maplibregl.NavigationControl(),
-      "top-right"
-    );
-
-    map.addControl(
-      new maplibregl.FullscreenControl(),
-      "top-right"
-    );
-
-    map.on("load", () => {
-      applyNeonMapStyle(map);
-      updateMarkers(
-        incidentsRef.current
-      );
-    });
-
-    map.on("error", (event) => {
-      console.error(
-        "MapLibre error:",
-        event?.error || event
-      );
-    });
-
-    return () => {
-      markersRef.current.forEach(
-        (marker) => {
-          marker.remove();
-        }
+      map.addControl(
+        new maplibregl.NavigationControl(),
+        "top-right"
       );
 
-      markersRef.current.clear();
+      map.addControl(
+        new maplibregl.FullscreenControl(),
+        "top-right"
+      );
 
-      map.remove();
-      mapRef.current = null;
-    };
+      map.on("load", () => {
+        applyNeonMapStyle(map);
+        updateMarkers(
+          incidentsRef.current
+        );
+      });
+
+      map.on("error", (event) => {
+        console.error(
+          "MapLibre error:",
+          event?.error || event
+        );
+      });
+
+      return () => {
+        markersRef.current.forEach(
+          (marker) => {
+            marker.remove();
+          }
+        );
+
+        markersRef.current.clear();
+
+        map.remove();
+        mapRef.current = null;
+      };
   }, []);
 
   useEffect(() => {
