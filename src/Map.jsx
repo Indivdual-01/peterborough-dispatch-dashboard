@@ -2,7 +2,6 @@ import React, {
   useEffect,
   useRef
 } from "react";
-
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -24,7 +23,7 @@ function safelySetPaint(
       value
     );
   } catch {
-    // Ignore unsupported paint properties
+    // Ignore unsupported properties
   }
 }
 
@@ -41,30 +40,24 @@ function safelySetLayout(
       value
     );
   } catch {
-    // Ignore unsupported layout properties
+    // Ignore unsupported properties
   }
 }
 
 function applyNeonMapStyle(map) {
   const style = map.getStyle();
-
-  const layers =
-    Array.isArray(style?.layers)
-      ? style.layers
-      : [];
+  const layers = Array.isArray(style?.layers)
+    ? style.layers
+    : [];
 
   layers.forEach((layer) => {
-    const layerId =
-      String(layer.id || "");
-
-    const sourceLayer =
-      String(
-        layer["source-layer"] || ""
-      );
+    const layerId = String(layer.id || "");
+    const sourceLayer = String(
+      layer["source-layer"] || ""
+    );
 
     const description =
-      `${layerId} ${sourceLayer}`
-        .toLowerCase();
+      `${layerId} ${sourceLayer}`.toLowerCase();
 
     const isWater =
       /water|ocean|lake|river|stream|reservoir|pond|basin|canal/.test(
@@ -72,11 +65,9 @@ function applyNeonMapStyle(map) {
       );
 
     const isBuilding =
-      /building/.test(
-        description
-      );
+      /building/.test(description);
 
-    const isFieldOrLandPatch =
+    const isFieldOrBeigePatch =
       /park|wood|forest|grass|grassland|landcover|landuse|nature|green|farmland|farm|field|meadow|scrub|wetland|sand|beach|cemetery|golf|orchard|vineyard|allotment|crop|pasture/.test(
         description
       );
@@ -116,7 +107,7 @@ function applyNeonMapStyle(map) {
         description
       );
 
-    // BACKGROUND
+    // Background
     if (layer.type === "background") {
       safelySetPaint(
         map,
@@ -124,62 +115,46 @@ function applyNeonMapStyle(map) {
         "background-color",
         "#000000"
       );
-
       safelySetPaint(
         map,
         layerId,
         "background-opacity",
         1
       );
-
       return;
     }
 
-    // FILLS
+    // Hide beige / field / landuse patches completely
+    if (isFieldOrBeigePatch) {
+      safelySetLayout(
+        map,
+        layerId,
+        "visibility",
+        "none"
+      );
+      return;
+    }
+
+    // Fill layers
     if (layer.type === "fill") {
       if (isWater) {
         safelySetPaint(
           map,
           layerId,
           "fill-color",
-          "#0a1f36"
+          "#0c2440"
         );
-
         safelySetPaint(
           map,
           layerId,
           "fill-opacity",
           1
         );
-
         safelySetPaint(
           map,
           layerId,
           "fill-outline-color",
-          "#0a1f36"
-        );
-      } else if (
-        isFieldOrLandPatch
-      ) {
-        safelySetPaint(
-          map,
-          layerId,
-          "fill-color",
-          "#000000"
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "fill-opacity",
-          1
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "fill-outline-color",
-          "#000000"
+          "#0c2440"
         );
       } else if (isBuilding) {
         safelySetPaint(
@@ -188,14 +163,12 @@ function applyNeonMapStyle(map) {
           "fill-color",
           "#181818"
         );
-
         safelySetPaint(
           map,
           layerId,
           "fill-opacity",
           0.96
         );
-
         safelySetPaint(
           map,
           layerId,
@@ -209,14 +182,12 @@ function applyNeonMapStyle(map) {
           "fill-color",
           "#000000"
         );
-
         safelySetPaint(
           map,
           layerId,
           "fill-opacity",
           1
         );
-
         safelySetPaint(
           map,
           layerId,
@@ -228,29 +199,24 @@ function applyNeonMapStyle(map) {
       return;
     }
 
-    // 3D BUILDINGS
-    if (
-      layer.type ===
-      "fill-extrusion"
-    ) {
+    // 3D buildings
+    if (layer.type === "fill-extrusion") {
       safelySetPaint(
         map,
         layerId,
         "fill-extrusion-color",
         "#1a1a1a"
       );
-
       safelySetPaint(
         map,
         layerId,
         "fill-extrusion-opacity",
         0.78
       );
-
       return;
     }
 
-    // ROADS / LINES
+    // Roads / lines
     if (layer.type === "line") {
       if (isMajorRoad) {
         safelySetPaint(
@@ -259,19 +225,17 @@ function applyNeonMapStyle(map) {
           "line-color",
           "#43b8d6"
         );
-
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
           0.88
         );
-
         safelySetPaint(
           map,
           layerId,
           "line-blur",
-          0.18
+          0.16
         );
       } else if (isLowUseRoad) {
         safelySetPaint(
@@ -280,14 +244,12 @@ function applyNeonMapStyle(map) {
           "line-color",
           "#7b5aa0"
         );
-
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
           0.78
         );
-
         safelySetPaint(
           map,
           layerId,
@@ -301,37 +263,31 @@ function applyNeonMapStyle(map) {
           "line-color",
           "#3a2a4a"
         );
-
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
           0.4
         );
-
         safelySetPaint(
           map,
           layerId,
           "line-blur",
           0.08
         );
-      } else if (
-        isResidentialRoad
-      ) {
+      } else if (isResidentialRoad) {
         safelySetPaint(
           map,
           layerId,
           "line-color",
           "#2b7f99"
         );
-
         safelySetPaint(
           map,
           layerId,
           "line-opacity",
           0.8
         );
-
         safelySetPaint(
           map,
           layerId,
@@ -343,9 +299,8 @@ function applyNeonMapStyle(map) {
           map,
           layerId,
           "line-color",
-          "#12314b"
+          "#173a5b"
         );
-
         safelySetPaint(
           map,
           layerId,
@@ -359,7 +314,6 @@ function applyNeonMapStyle(map) {
           "line-color",
           "#222222"
         );
-
         safelySetPaint(
           map,
           layerId,
@@ -373,7 +327,6 @@ function applyNeonMapStyle(map) {
           "line-color",
           "#171717"
         );
-
         safelySetPaint(
           map,
           layerId,
@@ -385,27 +338,8 @@ function applyNeonMapStyle(map) {
       return;
     }
 
-    // SYMBOLS / LABELS / ICONS
+    // Labels / symbols
     if (layer.type === "symbol") {
-      // Hide field / grass / park style icon overlays that create beige patches
-      if (isFieldOrLandPatch) {
-        safelySetPaint(
-          map,
-          layerId,
-          "icon-opacity",
-          0
-        );
-
-        safelySetPaint(
-          map,
-          layerId,
-          "text-opacity",
-          0
-        );
-
-        return;
-      }
-
       safelySetPaint(
         map,
         layerId,
@@ -448,7 +382,7 @@ function applyNeonMapStyle(map) {
       return;
     }
 
-    // CIRCLES
+    // Circle layers
     if (layer.type === "circle") {
       safelySetPaint(
         map,
@@ -456,26 +390,22 @@ function applyNeonMapStyle(map) {
         "circle-color",
         "#6e5b8b"
       );
-
       safelySetPaint(
         map,
         layerId,
         "circle-opacity",
         0.5
       );
+      return;
     }
 
-    // EXTRA SAFETY:
-    // If any land patch layer slipped through as another type, hide it if needed
-    if (
-      isFieldOrLandPatch &&
-      layer.type === "raster"
-    ) {
-      safelySetLayout(
+    // Raster fallback
+    if (layer.type === "raster") {
+      safelySetPaint(
         map,
         layerId,
-        "visibility",
-        "none"
+        "raster-opacity",
+        1
       );
     }
   });
@@ -537,10 +467,8 @@ function createPopupContent(
 
     time.className =
       "incident-popup-time";
-
     time.textContent =
       incident.time;
-
     container.appendChild(time);
   }
 
@@ -550,7 +478,6 @@ function createPopupContent(
 
     transcript.textContent =
       incident.transcript;
-
     container.appendChild(
       transcript
     );
@@ -691,7 +618,6 @@ function DispatchMap({
           existingMarker
             .setLngLat(coordinates)
             .setPopup(popup);
-
           return;
         }
 
